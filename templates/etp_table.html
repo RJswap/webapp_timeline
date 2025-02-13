@@ -1,0 +1,53 @@
+<!-- templates/etp_table.html -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tableau ETP - Danone</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1 class="page-title">Tableau des ETP par période</h1>
+        <nav class="navigation">
+            <a href="/" class="nav-link">← Retour à la Timeline</a>
+        </nav>
+        
+        <div class="etp-table-container">
+            <table class="etp-table">
+                <thead>
+                    <tr>
+                        <th>Stream</th>
+                        <th>2024 Q3-Q4</th>
+                        <th>2025 Q1-Q2</th>
+                        <th>2025 Q3-Q4</th>
+                        <th>2026-2027</th>
+                        <th>ETP Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in etp_data %}
+                    <tr>
+                        <td>{{ row.name }}</td>
+                        <td class="text-center">{{ "%.2f"|format(row["2024 Q3-Q4"]) }}</td>
+                        <td class="text-center">{{ "%.2f"|format(row["2025 Q1-Q2"]) }}</td>
+                        <td class="text-center">{{ "%.2f"|format(row["2025 Q3-Q4"]) }}</td>
+                        <td class="text-center">{{ "%.2f"|format(row["2026-2027"]) }}</td>
+                        <td class="text-center bold">{{ "%.2f"|format(row.total) }}</td>
+                    </tr>
+                    {% endfor %}
+                    <tr class="total-row">
+                        <td class="bold">Total ETP par période</td>
+                        <td class="text-center bold">{{ "%.2f"|format(period_totals["2024 Q3-Q4"]) }}</td>
+                        <td class="text-center bold">{{ "%.2f"|format(period_totals["2025 Q1-Q2"]) }}</td>
+                        <td class="text-center bold">{{ "%.2f"|format(period_totals["2025 Q3-Q4"]) }}</td>
+                        <td class="text-center bold">{{ "%.2f"|format(period_totals["2026-2027"]) }}</td>
+                        <td class="text-center bold">{{ "%.2f"|format(total_max_etp) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>
