@@ -1,3 +1,13 @@
+### run.py
+```py
+from app import create_app
+
+app = create_app()
+
+if __name__ == '__main__':
+    app.run(debug=True)
+```
+
 ### config.py
 ```py
 class Config:
@@ -9,16 +19,6 @@ class DevelopmentConfig(Config):
 
 class ProductionConfig(Config):
     DEBUG = False
-```
-
-### run.py
-```py
-from app import create_app
-
-app = create_app()
-
-if __name__ == '__main__':
-    app.run(debug=True)
 ```
 
 ### __init__.py
@@ -37,337 +37,6 @@ def create_app(config_class=DevelopmentConfig):
     
     return app
 
-```
-
-### timeline.html
-```html
-{% extends "base.html" %}
-
-{% block title %}Timeline - Project Manager{% endblock %}
-
-{% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/project/timeline.css') }}">
-{% endblock %}
-
-{% block content %}
-<div class="timeline-container">
-    <h1 class="page-title">Project Timeline</h1>
-    
-    <!-- Header avec les périodes -->
-    <div class="header-container">
-        <div class="periods-grid">
-            {% for period in periods %}
-            <div class="period">{{ period }}</div>
-            {% endfor %}
-        </div>
-    </div>
-
-    <!-- Contenu de la timeline -->
-    <div class="timeline-content">
-        {% for project in projects %}
-        <div class="project-row">
-            <div class="project-name">{{ project.name }}</div>
-            <div class="project-tasks">
-                {% for task in project.tasks %}
-                <div class="task bg-{{ task.color }}"
-                     style="grid-column: {{ task.start }} / span {{ task.width }};"
-                     data-task-info="{{ task.text }}">
-                    {{ task.text }}
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-        {% endfor %}
-
-        <!-- Jalons clés -->
-        <div class="milestones">
-            <div class="project-name">Jalons clés</div>
-            <div class="milestone-container">
-                {% for milestone in milestones %}
-                <div class="milestone {{ milestone.position }}">
-                    <div class="milestone-dot"></div>
-                    <div class="milestone-text">{{ milestone.text }}</div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}
-
-{% block extra_js %}
-<script src="{{ url_for('static', filename='js/project/timeline.js') }}"></script>
-{% endblock %}
-```
-
-### etp_table.html
-```html
-{% extends "base.html" %}
-
-{% block title %}ETP Table - Project Manager{% endblock %}
-
-{% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/project/etp_table.css') }}">
-{% endblock %}
-
-{% block content %}
-<div class="etp-container">
-    <h1 class="page-title">Resource Allocation (ETP)</h1>
-    
-    <div class="etp-table-container">
-        <table class="etp-table">
-            <thead>
-                <tr>
-                    <th>Stream</th>
-                    <th>2024 Q3-Q4</th>
-                    <th>2025 Q1-Q2</th>
-                    <th>2025 Q3-Q4</th>
-                    <th>2026-2027</th>
-                    <th>ETP Total</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for row in etp_data %}
-                <tr data-project="{{ row.name }}">
-                    <td>{{ row.name }}</td>
-                    <td class="text-center editable-cell" data-period="2024 Q3-Q4">
-                        <span class="etp-value">{{ "%.2f"|format(row["2024 Q3-Q4"]) }}</span>
-                    </td>
-                    <td class="text-center editable-cell" data-period="2025 Q1-Q2">
-                        <span class="etp-value">{{ "%.2f"|format(row["2025 Q1-Q2"]) }}</span>
-                    </td>
-                    <td class="text-center editable-cell" data-period="2025 Q3-Q4">
-                        <span class="etp-value">{{ "%.2f"|format(row["2025 Q3-Q4"]) }}</span>
-                    </td>
-                    <td class="text-center editable-cell" data-period="2026-2027">
-                        <span class="etp-value">{{ "%.2f"|format(row["2026-2027"]) }}</span>
-                    </td>
-                    <td class="text-center row-total">{{ "%.2f"|format(row.total) }}</td>
-                </tr>
-                {% endfor %}
-                <tr class="total-row">
-                    <td class="bold">Total ETP par période</td>
-                    <td class="text-center period-total" data-period="2024 Q3-Q4">
-                        {{ "%.2f"|format(period_totals["2024 Q3-Q4"]) }}
-                    </td>
-                    <td class="text-center period-total" data-period="2025 Q1-Q2">
-                        {{ "%.2f"|format(period_totals["2025 Q1-Q2"]) }}
-                    </td>
-                    <td class="text-center period-total" data-period="2025 Q3-Q4">
-                        {{ "%.2f"|format(period_totals["2025 Q3-Q4"]) }}
-                    </td>
-                    <td class="text-center period-total" data-period="2026-2027">
-                        {{ "%.2f"|format(period_totals["2026-2027"]) }}
-                    </td>
-                    <td class="text-center grand-total">{{ "%.2f"|format(total_max_etp) }}</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-</div>
-{% endblock %}
-
-{% block extra_js %}
-<script src="{{ url_for('static', filename='js/project/etp_table.js') }}"></script>
-{% endblock %}
-```
-
-### base.html
-```html
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Danone{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/normalize.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/etp_table.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/timeline.css') }}">
-    {% block extra_css %}{% endblock %}
-</head>
-<body>
-    <nav class="main-nav">
-        <div class="nav-content">
-            <a href="{{ url_for('main.index') }}" class="logo">Danone</a>
-            <ul class="nav-links">
-                <li><a href="{{ url_for('project.timeline') }}">Timeline</a></li>
-                <li><a href="{{ url_for('project.etp_table') }}">ETP</a></li>
-            </ul>
-        </div>
-    </nav>
-
-    <main class="main-content">
-        {% block content %}{% endblock %}
-    </main>
-
-    <footer class="main-footer">
-        <p>&copy; 2025 Project Manager</p>
-    </footer>
-
-    <script src="{{ url_for('static', filename='js/base.js') }}"></script>
-    {% block extra_js %}{% endblock %}
-</body>
-</html>
-
-```
-
-### etp_table.js
-```js
-// static/js/project/etp_table.js
-
-document.addEventListener('DOMContentLoaded', function() {
-    const table = document.querySelector('.etp-table');
-    let activeInput = null;
-
-    // Gérer le clic sur une cellule éditable
-    document.addEventListener('click', function(e) {
-        // Vérifier si on clique sur une cellule éditable ou son contenu
-        const cell = e.target.closest('.editable-cell');
-        if (!cell) return; // Si on n'a pas cliqué sur une cellule éditable
-        if (cell.querySelector('input')) return; // Si la cellule est déjà en mode édition
-
-        // Récupérer la valeur actuelle
-        const valueSpan = cell.querySelector('.etp-value');
-        const currentValue = valueSpan.textContent.trim();
-
-        // Créer l'input
-        const input = document.createElement('input');
-        input.type = 'number';
-        input.step = '0.1';
-        input.min = '0';
-        input.value = currentValue;
-        input.className = 'etp-input';
-
-        // Cacher la valeur et ajouter l'input
-        valueSpan.style.display = 'none';
-        cell.appendChild(input);
-        input.focus();
-        activeInput = input;
-
-        // Sélectionner tout le texte
-        input.select();
-    });
-
-    // Gérer la validation des modifications
-    async function saveChange(cell, newValue) {
-        const project = cell.closest('tr').dataset.project;
-        const period = cell.dataset.period;
-
-        try {
-            const response = await fetch('/project/api/update_etp', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    project,
-                    period,
-                    etp: newValue
-                })
-            });
-
-            if (!response.ok) throw new Error('Failed to update ETP');
-
-            // Mettre à jour l'affichage
-            const valueSpan = cell.querySelector('.etp-value');
-            valueSpan.textContent = parseFloat(newValue).toFixed(2);
-            valueSpan.style.display = '';
-            valueSpan.classList.add('updated');
-            
-            // Supprimer l'input
-            if (cell.querySelector('input')) {
-                cell.querySelector('input').remove();
-            }
-
-            // Mettre à jour les totaux
-            updateTotals();
-            
-        } catch (error) {
-            console.error('Error updating ETP:', error);
-            alert('Failed to update ETP');
-        }
-    }
-
-    // Gérer les touches clavier pendant l'édition
-    document.addEventListener('keydown', function(e) {
-        if (!activeInput) return;
-        
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            const newValue = activeInput.value;
-            if (newValue && !isNaN(newValue)) {
-                const cell = activeInput.closest('.editable-cell');
-                saveChange(cell, newValue);
-            }
-            activeInput = null;
-        } else if (e.key === 'Escape') {
-            const cell = activeInput.closest('.editable-cell');
-            cell.querySelector('.etp-value').style.display = '';
-            activeInput.remove();
-            activeInput = null;
-        }
-    });
-
-    // Gérer la perte de focus
-    document.addEventListener('click', function(e) {
-        if (activeInput && !activeInput.contains(e.target) && !e.target.closest('.editable-cell')) {
-            const newValue = activeInput.value;
-            if (newValue && !isNaN(newValue)) {
-                const cell = activeInput.closest('.editable-cell');
-                saveChange(cell, newValue);
-            }
-            activeInput = null;
-        }
-    });
-
-    // Fonction pour mettre à jour tous les totaux
-    function updateTotals() {
-        // Totaux par période
-        const periods = ['2024 Q3-Q4', '2025 Q1-Q2', '2025 Q3-Q4', '2026-2027'];
-        
-        periods.forEach(period => {
-            const cells = table.querySelectorAll(`td[data-period="${period}"] .etp-value`);
-            const total = Array.from(cells)
-                .reduce((sum, cell) => sum + parseFloat(cell.textContent || 0), 0);
-            const totalCell = table.querySelector(`.period-total[data-period="${period}"]`);
-            if (totalCell) {
-                totalCell.textContent = total.toFixed(2);
-                totalCell.classList.add('updated');
-            }
-        });
-
-        // Totaux par ligne (max ETP)
-        const projectRows = table.querySelectorAll('tr[data-project]');
-        projectRows.forEach(row => {
-            const etpCells = row.querySelectorAll('.etp-value');
-            const maxEtp = Array.from(etpCells)
-                .reduce((max, cell) => Math.max(max, parseFloat(cell.textContent || 0)), 0);
-            const totalCell = row.querySelector('.row-total');
-            if (totalCell) {
-                totalCell.textContent = maxEtp.toFixed(2);
-                totalCell.classList.add('updated');
-            }
-        });
-
-        // Total général (somme des max ETP)
-        const rowTotals = Array.from(table.querySelectorAll('.row-total'))
-            .map(cell => parseFloat(cell.textContent || 0));
-        const grandTotal = rowTotals.reduce((sum, val) => sum + val, 0);
-        const grandTotalCell = table.querySelector('.grand-total');
-        if (grandTotalCell) {
-            grandTotalCell.textContent = grandTotal.toFixed(2);
-            grandTotalCell.classList.add('updated');
-        }
-
-        // Retirer les classes 'updated' après l'animation
-        setTimeout(() => {
-            table.querySelectorAll('.updated').forEach(el => {
-                el.classList.remove('updated');
-            });
-        }, 1000);
-    }
-});
 ```
 
 ### base.js
@@ -550,6 +219,200 @@ document.addEventListener('DOMContentLoaded', function() {
     // Lancer l'initialisation
     init();
 });
+```
+
+### base.css
+```css
+:root {
+    --primary-color: #312e81;
+    --secondary-color: #3b82f6;
+    --background-color: #f3f4f6;
+    --text-color: #1f2937;
+    --border-color: #e5e7eb;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+}
+
+.main-nav {
+    background-color: var(--primary-color);
+    padding: 1rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.nav-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo {
+    color: white;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 1.25rem;
+}
+
+.nav-links {
+    list-style: none;
+    display: flex;
+    gap: 2rem;
+}
+
+.nav-links a {
+    color: white;
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+    transition: background-color 0.3s;
+}
+
+.nav-links a:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.main-content {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+}
+
+.main-footer {
+    background-color: var(--primary-color);
+    color: white;
+    text-align: center;
+    padding: 1rem;
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+}
+
+.page-title {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 2rem;
+    color: var(--primary-color);
+}
+
+
+
+
+```
+
+### etp_table.css
+```css
+.etp-container {
+    background-color: white;
+    border-radius: 0.5rem;
+    padding: 2rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.etp-table-container {
+    overflow-x: auto;
+}
+
+.etp-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.etp-table th,
+.etp-table td {
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border-color);
+}
+
+.etp-table th {
+    background-color: var(--primary-color);
+    color: white;
+    font-weight: 500;
+    text-align: left;
+}
+
+.etp-table td {
+    background-color: white;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.bold {
+    font-weight: 600;
+}
+
+.total-row {
+    background-color: #f8fafc;
+}
+
+.total-row td {
+    background-color: #f8fafc;
+}
+
+.editable-cell {
+    cursor: pointer;
+    position: relative;
+    transition: background-color 0.2s;
+}
+
+.editable-cell:hover {
+    background-color: #f0f9ff;
+}
+
+.editable-cell .etp-value {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.editable-cell input {
+    width: 100%;
+    height: 100%;
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--primary-color);
+    text-align: center;
+    font-size: inherit;
+    background-color: white;
+    position: absolute;
+    top: 0;
+    left: 0;
+    margin: 0;
+    box-sizing: border-box;
+}
+
+.editable-cell input:focus {
+    outline: none;
+    border: 2px solid var(--secondary-color);
+}
+
+/* Animation pour les mises à jour */
+.updated {
+    animation: highlight 1s ease-out;
+}
+
+@keyframes highlight {
+    0% {
+        background-color: #93c5fd;
+    }
+    100% {
+        background-color: transparent;
+    }
+}
+
+/* Style spécifique pour les totaux */
+.row-total,
+.period-total,
+.grand-total {
+    font-weight: 600;
+    background-color: #f8fafc;
+}
 ```
 
 ### timeline.css
@@ -747,198 +610,162 @@ h6 {
 }
 ```
 
-### etp_table.css
-```css
-.etp-container {
-    background-color: white;
-    border-radius: 0.5rem;
-    padding: 2rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
+### etp_table.js
+```js
+// static/js/project/etp_table.js
 
-.etp-table-container {
-    overflow-x: auto;
-}
+document.addEventListener('DOMContentLoaded', function() {
+    const table = document.querySelector('.etp-table');
+    let activeInput = null;
 
-.etp-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 1rem;
-}
+    // Gérer le clic sur une cellule éditable
+    document.addEventListener('click', function(e) {
+        // Vérifier si on clique sur une cellule éditable ou son contenu
+        const cell = e.target.closest('.editable-cell');
+        if (!cell) return; // Si on n'a pas cliqué sur une cellule éditable
+        if (cell.querySelector('input')) return; // Si la cellule est déjà en mode édition
 
-.etp-table th,
-.etp-table td {
-    padding: 0.75rem 1rem;
-    border: 1px solid var(--border-color);
-}
+        // Récupérer la valeur actuelle
+        const valueSpan = cell.querySelector('.etp-value');
+        const currentValue = valueSpan.textContent.trim();
 
-.etp-table th {
-    background-color: var(--primary-color);
-    color: white;
-    font-weight: 500;
-    text-align: left;
-}
+        // Créer l'input
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.step = '0.1';
+        input.min = '0';
+        input.value = currentValue;
+        input.className = 'etp-input';
 
-.etp-table td {
-    background-color: white;
-}
+        // Cacher la valeur et ajouter l'input
+        valueSpan.style.display = 'none';
+        cell.appendChild(input);
+        input.focus();
+        activeInput = input;
 
-.text-center {
-    text-align: center;
-}
+        // Sélectionner tout le texte
+        input.select();
+    });
 
-.bold {
-    font-weight: 600;
-}
+    // Gérer la validation des modifications
+    async function saveChange(cell, newValue) {
+        const project = cell.closest('tr').dataset.project;
+        const period = cell.dataset.period;
 
-.total-row {
-    background-color: #f8fafc;
-}
+        try {
+            const response = await fetch('/project/api/update_etp', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    project,
+                    period,
+                    etp: newValue
+                })
+            });
 
-.total-row td {
-    background-color: #f8fafc;
-}
+            if (!response.ok) throw new Error('Failed to update ETP');
 
-.editable-cell {
-    cursor: pointer;
-    position: relative;
-    transition: background-color 0.2s;
-}
+            // Mettre à jour l'affichage
+            const valueSpan = cell.querySelector('.etp-value');
+            valueSpan.textContent = parseFloat(newValue).toFixed(2);
+            valueSpan.style.display = '';
+            valueSpan.classList.add('updated');
+            
+            // Supprimer l'input
+            if (cell.querySelector('input')) {
+                cell.querySelector('input').remove();
+            }
 
-.editable-cell:hover {
-    background-color: #f0f9ff;
-}
-
-.editable-cell .etp-value {
-    display: block;
-    width: 100%;
-    height: 100%;
-}
-
-.editable-cell input {
-    width: 100%;
-    height: 100%;
-    padding: 0.75rem 1rem;
-    border: 2px solid var(--primary-color);
-    text-align: center;
-    font-size: inherit;
-    background-color: white;
-    position: absolute;
-    top: 0;
-    left: 0;
-    margin: 0;
-    box-sizing: border-box;
-}
-
-.editable-cell input:focus {
-    outline: none;
-    border: 2px solid var(--secondary-color);
-}
-
-/* Animation pour les mises à jour */
-.updated {
-    animation: highlight 1s ease-out;
-}
-
-@keyframes highlight {
-    0% {
-        background-color: #93c5fd;
+            // Mettre à jour les totaux
+            updateTotals();
+            
+        } catch (error) {
+            console.error('Error updating ETP:', error);
+            alert('Failed to update ETP');
+        }
     }
-    100% {
-        background-color: transparent;
+
+    // Gérer les touches clavier pendant l'édition
+    document.addEventListener('keydown', function(e) {
+        if (!activeInput) return;
+        
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const newValue = activeInput.value;
+            if (newValue && !isNaN(newValue)) {
+                const cell = activeInput.closest('.editable-cell');
+                saveChange(cell, newValue);
+            }
+            activeInput = null;
+        } else if (e.key === 'Escape') {
+            const cell = activeInput.closest('.editable-cell');
+            cell.querySelector('.etp-value').style.display = '';
+            activeInput.remove();
+            activeInput = null;
+        }
+    });
+
+    // Gérer la perte de focus
+    document.addEventListener('click', function(e) {
+        if (activeInput && !activeInput.contains(e.target) && !e.target.closest('.editable-cell')) {
+            const newValue = activeInput.value;
+            if (newValue && !isNaN(newValue)) {
+                const cell = activeInput.closest('.editable-cell');
+                saveChange(cell, newValue);
+            }
+            activeInput = null;
+        }
+    });
+
+    // Fonction pour mettre à jour tous les totaux
+    function updateTotals() {
+        // Totaux par période
+        const periods = ['2024 Q3-Q4', '2025 Q1-Q2', '2025 Q3-Q4', '2026-2027'];
+        
+        periods.forEach(period => {
+            const cells = table.querySelectorAll(`td[data-period="${period}"] .etp-value`);
+            const total = Array.from(cells)
+                .reduce((sum, cell) => sum + parseFloat(cell.textContent || 0), 0);
+            const totalCell = table.querySelector(`.period-total[data-period="${period}"]`);
+            if (totalCell) {
+                totalCell.textContent = total.toFixed(2);
+                totalCell.classList.add('updated');
+            }
+        });
+
+        // Totaux par ligne (max ETP)
+        const projectRows = table.querySelectorAll('tr[data-project]');
+        projectRows.forEach(row => {
+            const etpCells = row.querySelectorAll('.etp-value');
+            const maxEtp = Array.from(etpCells)
+                .reduce((max, cell) => Math.max(max, parseFloat(cell.textContent || 0)), 0);
+            const totalCell = row.querySelector('.row-total');
+            if (totalCell) {
+                totalCell.textContent = maxEtp.toFixed(2);
+                totalCell.classList.add('updated');
+            }
+        });
+
+        // Total général (somme des max ETP)
+        const rowTotals = Array.from(table.querySelectorAll('.row-total'))
+            .map(cell => parseFloat(cell.textContent || 0));
+        const grandTotal = rowTotals.reduce((sum, val) => sum + val, 0);
+        const grandTotalCell = table.querySelector('.grand-total');
+        if (grandTotalCell) {
+            grandTotalCell.textContent = grandTotal.toFixed(2);
+            grandTotalCell.classList.add('updated');
+        }
+
+        // Retirer les classes 'updated' après l'animation
+        setTimeout(() => {
+            table.querySelectorAll('.updated').forEach(el => {
+                el.classList.remove('updated');
+            });
+        }, 1000);
     }
-}
-
-/* Style spécifique pour les totaux */
-.row-total,
-.period-total,
-.grand-total {
-    font-weight: 600;
-    background-color: #f8fafc;
-}
-```
-
-### base.css
-```css
-:root {
-    --primary-color: #312e81;
-    --secondary-color: #3b82f6;
-    --background-color: #f3f4f6;
-    --text-color: #1f2937;
-    --border-color: #e5e7eb;
-}
-
-body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
-    background-color: var(--background-color);
-    color: var(--text-color);
-}
-
-.main-nav {
-    background-color: var(--primary-color);
-    padding: 1rem;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.nav-content {
-    max-width: 1200px;
-    margin: 0 auto;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.logo {
-    color: white;
-    text-decoration: none;
-    font-weight: bold;
-    font-size: 1.25rem;
-}
-
-.nav-links {
-    list-style: none;
-    display: flex;
-    gap: 2rem;
-}
-
-.nav-links a {
-    color: white;
-    text-decoration: none;
-    padding: 0.5rem 1rem;
-    border-radius: 0.25rem;
-    transition: background-color 0.3s;
-}
-
-.nav-links a:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-}
-
-.main-content {
-    max-width: 1200px;
-    margin: 2rem auto;
-    padding: 0 1rem;
-}
-
-.main-footer {
-    background-color: var(--primary-color);
-    color: white;
-    text-align: center;
-    padding: 1rem;
-    position: fixed;
-    bottom: 0;
-    width: 100%;
-}
-
-.page-title {
-    font-size: 1.5rem;
-    font-weight: bold;
-    margin-bottom: 2rem;
-    color: var(--primary-color);
-}
-
-
-
-
+});
 ```
 
 ### project_service.py
@@ -1053,75 +880,44 @@ class EtpService:
         return etp_data, period_totals
 ```
 
-### project.py
-```py
-from flask import Blueprint, render_template
-from flask import jsonify, request
-from app.services.project_service import ProjectService
-from app.services.etp_service import EtpService
-from app.constants import TimeConstants
+### base.html
+```html
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Danone{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/normalize.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/etp_table.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/timeline.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <nav class="main-nav">
+        <div class="nav-content">
+            <a href="{{ url_for('main.index') }}" class="logo">Danone</a>
+            <ul class="nav-links">
+                <li><a href="{{ url_for('project.timeline') }}">Timeline</a></li>
+                <li><a href="{{ url_for('project.etp_table') }}">ETP</a></li>
+            </ul>
+        </div>
+    </nav>
 
-bp = Blueprint('project', __name__, url_prefix='/project')
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
 
-@bp.route('/timeline')
-def timeline():
-    projects = ProjectService.get_all_projects()
-    return render_template('project/timeline.html', 
-                         projects=[p.to_dict() for p in projects], 
-                         periods=TimeConstants.PERIODS_DISPLAY, 
-                         milestones=TimeConstants.MILESTONES)
+    <footer class="main-footer">
+        <p>&copy; 2025 Project Manager</p>
+    </footer>
 
-@bp.route('/etp_table')
-def etp_table():
-    projects = ProjectService.get_all_projects()
-    etp_data, period_totals = EtpService.calculate_etp_per_period(projects)
-    total_max_etp = sum(row["total"] for row in etp_data)
-    
-    return render_template('project/etp_table.html', 
-                         etp_data=etp_data, 
-                         period_totals=period_totals,
-                         total_max_etp=total_max_etp)
+    <script src="{{ url_for('static', filename='js/base.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
 
-
-from flask import redirect, url_for
-
-@bp.route('/etp')
-def etp_redirect():
-    return redirect(url_for('project.etp_table'))
-
-from flask import jsonify, request
-
-@bp.route('/api/update_etp', methods=['POST'])
-def update_etp():
-    try:
-        data = request.json
-        project_name = data.get('project')
-        period = data.get('period')
-        new_etp = float(data.get('etp'))
-        
-        # Pour l'instant, nous ne persistons pas les données
-        # Vous pourriez ajouter ici la logique de sauvegarde en base de données
-        
-        return jsonify({
-            'status': 'success',
-            'message': f'ETP updated for {project_name} in period {period}'
-        })
-    except Exception as e:
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
-        }), 400
-```
-
-### main.py
-```py
-from flask import Blueprint, render_template
-
-bp = Blueprint('main', __name__)
-
-@bp.route('/')
-def index():
-    return render_template('base.html')
 ```
 
 ### constants.py
@@ -1196,6 +992,66 @@ class Task:
 
 ### project.py
 ```py
+from flask import Blueprint, render_template
+from flask import jsonify, request
+from app.services.project_service import ProjectService
+from app.services.etp_service import EtpService
+from app.constants import TimeConstants
+
+bp = Blueprint('project', __name__, url_prefix='/project')
+
+@bp.route('/timeline')
+def timeline():
+    projects = ProjectService.get_all_projects()
+    return render_template('project/timeline.html', 
+                         projects=[p.to_dict() for p in projects], 
+                         periods=TimeConstants.PERIODS_DISPLAY, 
+                         milestones=TimeConstants.MILESTONES)
+
+@bp.route('/etp_table')
+def etp_table():
+    projects = ProjectService.get_all_projects()
+    etp_data, period_totals = EtpService.calculate_etp_per_period(projects)
+    total_max_etp = sum(row["total"] for row in etp_data)
+    
+    return render_template('project/etp_table.html', 
+                         etp_data=etp_data, 
+                         period_totals=period_totals,
+                         total_max_etp=total_max_etp)
+
+
+from flask import redirect, url_for
+
+@bp.route('/etp')
+def etp_redirect():
+    return redirect(url_for('project.etp_table'))
+
+from flask import jsonify, request
+
+@bp.route('/api/update_etp', methods=['POST'])
+def update_etp():
+    try:
+        data = request.json
+        project_name = data.get('project')
+        period = data.get('period')
+        new_etp = float(data.get('etp'))
+        
+        # Pour l'instant, nous ne persistons pas les données
+        # Vous pourriez ajouter ici la logique de sauvegarde en base de données
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'ETP updated for {project_name} in period {period}'
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 400
+```
+
+### project.py
+```py
 from dataclasses import dataclass
 from typing import List
 from .task import Task
@@ -1210,5 +1066,149 @@ class Project:
             'name': self.name,
             'tasks': [task.to_dict() for task in self.tasks]
         }
+```
+
+### main.py
+```py
+from flask import Blueprint, render_template
+
+bp = Blueprint('main', __name__)
+
+@bp.route('/')
+def index():
+    return render_template('base.html')
+```
+
+### timeline.html
+```html
+{% extends "base.html" %}
+
+{% block title %}Timeline - Project Manager{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/project/timeline.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="timeline-container">
+    <h1 class="page-title">Project Timeline</h1>
+    
+    <!-- Header avec les périodes -->
+    <div class="header-container">
+        <div class="periods-grid">
+            {% for period in periods %}
+            <div class="period">{{ period }}</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Contenu de la timeline -->
+    <div class="timeline-content">
+        {% for project in projects %}
+        <div class="project-row">
+            <div class="project-name">{{ project.name }}</div>
+            <div class="project-tasks">
+                {% for task in project.tasks %}
+                <div class="task bg-{{ task.color }}"
+                     style="grid-column: {{ task.start }} / span {{ task.width }};"
+                     data-task-info="{{ task.text }}">
+                    {{ task.text }}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+
+        <!-- Jalons clés -->
+        <div class="milestones">
+            <div class="project-name">Jalons clés</div>
+            <div class="milestone-container">
+                {% for milestone in milestones %}
+                <div class="milestone {{ milestone.position }}">
+                    <div class="milestone-dot"></div>
+                    <div class="milestone-text">{{ milestone.text }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/project/timeline.js') }}"></script>
+{% endblock %}
+```
+
+### etp_table.html
+```html
+{% extends "base.html" %}
+
+{% block title %}ETP Table - Project Manager{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/project/etp_table.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="etp-container">
+    <h1 class="page-title">Resource Allocation (ETP)</h1>
+    
+    <div class="etp-table-container">
+        <table class="etp-table">
+            <thead>
+                <tr>
+                    <th>Stream</th>
+                    <th>2024 Q3-Q4</th>
+                    <th>2025 Q1-Q2</th>
+                    <th>2025 Q3-Q4</th>
+                    <th>2026-2027</th>
+                    <th>ETP Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in etp_data %}
+                <tr data-project="{{ row.name }}">
+                    <td>{{ row.name }}</td>
+                    <td class="text-center editable-cell" data-period="2024 Q3-Q4">
+                        <span class="etp-value">{{ "%.2f"|format(row["2024 Q3-Q4"]) }}</span>
+                    </td>
+                    <td class="text-center editable-cell" data-period="2025 Q1-Q2">
+                        <span class="etp-value">{{ "%.2f"|format(row["2025 Q1-Q2"]) }}</span>
+                    </td>
+                    <td class="text-center editable-cell" data-period="2025 Q3-Q4">
+                        <span class="etp-value">{{ "%.2f"|format(row["2025 Q3-Q4"]) }}</span>
+                    </td>
+                    <td class="text-center editable-cell" data-period="2026-2027">
+                        <span class="etp-value">{{ "%.2f"|format(row["2026-2027"]) }}</span>
+                    </td>
+                    <td class="text-center row-total">{{ "%.2f"|format(row.total) }}</td>
+                </tr>
+                {% endfor %}
+                <tr class="total-row">
+                    <td class="bold">Total ETP par période</td>
+                    <td class="text-center period-total" data-period="2024 Q3-Q4">
+                        {{ "%.2f"|format(period_totals["2024 Q3-Q4"]) }}
+                    </td>
+                    <td class="text-center period-total" data-period="2025 Q1-Q2">
+                        {{ "%.2f"|format(period_totals["2025 Q1-Q2"]) }}
+                    </td>
+                    <td class="text-center period-total" data-period="2025 Q3-Q4">
+                        {{ "%.2f"|format(period_totals["2025 Q3-Q4"]) }}
+                    </td>
+                    <td class="text-center period-total" data-period="2026-2027">
+                        {{ "%.2f"|format(period_totals["2026-2027"]) }}
+                    </td>
+                    <td class="text-center grand-total">{{ "%.2f"|format(total_max_etp) }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/project/etp_table.js') }}"></script>
+{% endblock %}
 ```
 
