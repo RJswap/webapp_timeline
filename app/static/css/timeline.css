@@ -1,0 +1,147 @@
+.timeline-container {
+    background-color: white;
+    border-radius: 0.5rem;
+    padding: 2rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.periods-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    background-color: var(--primary-color);
+    color: white;
+    border-radius: 0.25rem;
+    overflow: hidden;
+}
+
+.period {
+    padding: 0.5rem;
+    text-align: center;
+    border-right: 1px solid rgba(255, 255, 255, 0.2);
+    font-size: 0.875rem;
+}
+
+.project-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+    background-color: #f9fafb;
+}
+
+.project-name {
+    font-weight: 600;
+    width: 8rem;
+    padding-right: 1rem;
+}
+
+.project-tasks {
+    flex-grow: 1;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 0.25rem;
+}
+
+.task {
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    color: white;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.task:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    overflow: visible;
+    white-space: normal;
+    z-index: 1;
+}
+
+/* Milestones styles */
+.milestones {
+    margin-top: 3rem;
+}
+
+.milestone-container {
+    position: relative;
+    height: 4rem;
+    background-color: #f9fafb;
+    border-radius: 0.25rem;
+    padding: 1rem;
+}
+
+.milestone {
+    position: absolute;
+    top: 50%;
+}
+
+/* Specific milestone positions */
+.milestone.left-1\/3 {
+    left: 33.33%;
+}
+
+.milestone.left-1\/2 {
+    left: 50%;
+}
+
+.milestone.left-2\/3 {
+    left: 66.66%;
+}
+
+.milestone.right-1\/6 {
+    left: 83.33%;
+}
+
+.milestone-dot {
+    width: 1rem;
+    height: 1rem;
+    background-color: var(--secondary-color);
+    border-radius: 50%;
+    margin: 0 auto;
+}
+
+.milestone-text {
+    position: absolute;
+    font-size: 0.75rem;
+    text-align: center;
+    margin-top: 0.5rem;
+    font-weight: 500;
+    transform: translateX(-50%);
+    white-space: nowrap;
+}
+
+/* Task colors */
+.bg-blue-600 { background-color: #2563eb; }
+.bg-blue-500 { background-color: #3b82f6; }
+.bg-purple-600 { background-color: #9333ea; }
+.bg-purple-500 { background-color: #a855f7; }
+.bg-purple-400 { background-color: #c084fc; }
+.bg-green-600 { background-color: #16a34a; }
+.bg-green-500 { background-color: #22c55e; }
+.bg-green-400 { background-color: #4ade80; }
+.bg-yellow-600 { background-color: #ca8a04; }
+.bg-red-600 { background-color: #dc2626; }
+.bg-red-500 { background-color: #ef4444; }
+.bg-indigo-600 { background-color: #4f46e5; }
+.bg-indigo-500 { background-color: #6366f1; }
+.bg-teal-600 { background-color: #0d9488; }
+.bg-teal-500 { background-color: #14b8a6; }
+.bg-gray-600 { background-color: #4b5563; }
+.bg-gray-500 { background-color: #6b7280; }
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .project-name {
+        width: 6rem;
+    }
+    
+    .task {
+        font-size: 0.7rem;
+    }
+}

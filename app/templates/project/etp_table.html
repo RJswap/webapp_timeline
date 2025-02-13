@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}ETP Table - Project Manager{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/project/etp_table.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="etp-container">
+    <h1 class="page-title">Resource Allocation (ETP)</h1>
+    
+    <div class="etp-table-container">
+        <table class="etp-table">
+            <thead>
+                <tr>
+                    <th>Stream</th>
+                    <th>2024 Q3-Q4</th>
+                    <th>2025 Q1-Q2</th>
+                    <th>2025 Q3-Q4</th>
+                    <th>2026-2027</th>
+                    <th>ETP Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in etp_data %}
+                <tr data-project="{{ row.name }}">
+                    <td>{{ row.name }}</td>
+                    <td class="text-center editable-cell" data-period="2024 Q3-Q4">
+                        <span class="etp-value">{{ "%.2f"|format(row["2024 Q3-Q4"]) }}</span>
+                    </td>
+                    <td class="text-center editable-cell" data-period="2025 Q1-Q2">
+                        <span class="etp-value">{{ "%.2f"|format(row["2025 Q1-Q2"]) }}</span>
+                    </td>
+                    <td class="text-center editable-cell" data-period="2025 Q3-Q4">
+                        <span class="etp-value">{{ "%.2f"|format(row["2025 Q3-Q4"]) }}</span>
+                    </td>
+                    <td class="text-center editable-cell" data-period="2026-2027">
+                        <span class="etp-value">{{ "%.2f"|format(row["2026-2027"]) }}</span>
+                    </td>
+                    <td class="text-center row-total">{{ "%.2f"|format(row.total) }}</td>
+                </tr>
+                {% endfor %}
+                <tr class="total-row">
+                    <td class="bold">Total ETP par période</td>
+                    <td class="text-center period-total" data-period="2024 Q3-Q4">
+                        {{ "%.2f"|format(period_totals["2024 Q3-Q4"]) }}
+                    </td>
+                    <td class="text-center period-total" data-period="2025 Q1-Q2">
+                        {{ "%.2f"|format(period_totals["2025 Q1-Q2"]) }}
+                    </td>
+                    <td class="text-center period-total" data-period="2025 Q3-Q4">
+                        {{ "%.2f"|format(period_totals["2025 Q3-Q4"]) }}
+                    </td>
+                    <td class="text-center period-total" data-period="2026-2027">
+                        {{ "%.2f"|format(period_totals["2026-2027"]) }}
+                    </td>
+                    <td class="text-center grand-total">{{ "%.2f"|format(total_max_etp) }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/project/etp_table.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,107 @@
+.etp-container {
+    background-color: white;
+    border-radius: 0.5rem;
+    padding: 2rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.etp-table-container {
+    overflow-x: auto;
+}
+
+.etp-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.etp-table th,
+.etp-table td {
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border-color);
+}
+
+.etp-table th {
+    background-color: var(--primary-color);
+    color: white;
+    font-weight: 500;
+    text-align: left;
+}
+
+.etp-table td {
+    background-color: white;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.bold {
+    font-weight: 600;
+}
+
+.total-row {
+    background-color: #f8fafc;
+}
+
+.total-row td {
+    background-color: #f8fafc;
+}
+
+.editable-cell {
+    cursor: pointer;
+    position: relative;
+    transition: background-color 0.2s;
+}
+
+.editable-cell:hover {
+    background-color: #f0f9ff;
+}
+
+.editable-cell .etp-value {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.editable-cell input {
+    width: 100%;
+    height: 100%;
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--primary-color);
+    text-align: center;
+    font-size: inherit;
+    background-color: white;
+    position: absolute;
+    top: 0;
+    left: 0;
+    margin: 0;
+    box-sizing: border-box;
+}
+
+.editable-cell input:focus {
+    outline: none;
+    border: 2px solid var(--secondary-color);
+}
+
+/* Animation pour les mises à jour */
+.updated {
+    animation: highlight 1s ease-out;
+}
+
+@keyframes highlight {
+    0% {
+        background-color: #93c5fd;
+    }
+    100% {
+        background-color: transparent;
+    }
+}
+
+/* Style spécifique pour les totaux */
+.row-total,
+.period-total,
+.grand-total {
+    font-weight: 600;
+    background-color: #f8fafc;
+}

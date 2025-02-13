@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Timeline - Project Manager{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/project/timeline.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="timeline-container">
+    <h1 class="page-title">Project Timeline</h1>
+    
+    <!-- Header avec les périodes -->
+    <div class="header-container">
+        <div class="periods-grid">
+            {% for period in periods %}
+            <div class="period">{{ period }}</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Contenu de la timeline -->
+    <div class="timeline-content">
+        {% for project in projects %}
+        <div class="project-row">
+            <div class="project-name">{{ project.name }}</div>
+            <div class="project-tasks">
+                {% for task in project.tasks %}
+                <div class="task bg-{{ task.color }}"
+                     style="grid-column: {{ task.start }} / span {{ task.width }};"
+                     data-task-info="{{ task.text }}">
+                    {{ task.text }}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+
+        <!-- Jalons clés -->
+        <div class="milestones">
+            <div class="project-name">Jalons clés</div>
+            <div class="milestone-container">
+                {% for milestone in milestones %}
+                <div class="milestone {{ milestone.position }}">
+                    <div class="milestone-dot"></div>
+                    <div class="milestone-text">{{ milestone.text }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/project/timeline.js') }}"></script>
+{% endblock %}
