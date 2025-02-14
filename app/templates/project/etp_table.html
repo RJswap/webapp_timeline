@@ -15,7 +15,6 @@
             <thead>
                 <tr>
                     <th>Stream</th>
-                    <th>2024 Q3-Q4</th>
                     <th>2025 Q1-Q2</th>
                     <th>2025 Q3-Q4</th>
                     <th>2026-2027</th>
@@ -26,9 +25,6 @@
                 {% for row in etp_data %}
                 <tr data-project="{{ row.name }}">
                     <td>{{ row.name }}</td>
-                    <td class="text-center editable-cell" data-period="2024 Q3-Q4">
-                        <span class="etp-value">{{ "%.2f"|format(row["2024 Q3-Q4"]) }}</span>
-                    </td>
                     <td class="text-center editable-cell" data-period="2025 Q1-Q2">
                         <span class="etp-value">{{ "%.2f"|format(row["2025 Q1-Q2"]) }}</span>
                     </td>
@@ -43,9 +39,6 @@
                 {% endfor %}
                 <tr class="total-row">
                     <td class="bold">Total ETP par période</td>
-                    <td class="text-center period-total" data-period="2024 Q3-Q4">
-                        {{ "%.2f"|format(period_totals["2024 Q3-Q4"]) }}
-                    </td>
                     <td class="text-center period-total" data-period="2025 Q1-Q2">
                         {{ "%.2f"|format(period_totals["2025 Q1-Q2"]) }}
                     </td>

@@ -6,16 +6,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Gérer le clic sur une cellule éditable
     document.addEventListener('click', function(e) {
-        // Vérifier si on clique sur une cellule éditable ou son contenu
         const cell = e.target.closest('.editable-cell');
-        if (!cell) return; // Si on n'a pas cliqué sur une cellule éditable
-        if (cell.querySelector('input')) return; // Si la cellule est déjà en mode édition
+        if (!cell) return;
+        if (cell.querySelector('input')) return;
 
-        // Récupérer la valeur actuelle
         const valueSpan = cell.querySelector('.etp-value');
         const currentValue = valueSpan.textContent.trim();
 
-        // Créer l'input
         const input = document.createElement('input');
         input.type = 'number';
         input.step = '0.1';
@@ -23,13 +20,11 @@ document.addEventListener('DOMContentLoaded', function() {
         input.value = currentValue;
         input.className = 'etp-input';
 
-        // Cacher la valeur et ajouter l'input
         valueSpan.style.display = 'none';
         cell.appendChild(input);
         input.focus();
         activeInput = input;
 
-        // Sélectionner tout le texte
         input.select();
     });
 
@@ -53,18 +48,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (!response.ok) throw new Error('Failed to update ETP');
 
-            // Mettre à jour l'affichage
             const valueSpan = cell.querySelector('.etp-value');
             valueSpan.textContent = parseFloat(newValue).toFixed(2);
             valueSpan.style.display = '';
             valueSpan.classList.add('updated');
             
-            // Supprimer l'input
             if (cell.querySelector('input')) {
                 cell.querySelector('input').remove();
             }
 
-            // Mettre à jour les totaux
             updateTotals();
             
         } catch (error) {
@@ -108,7 +100,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Fonction pour mettre à jour tous les totaux
     function updateTotals() {
         // Totaux par période
-        const periods = ['2024 Q3-Q4', '2025 Q1-Q2', '2025 Q3-Q4', '2026-2027'];
+        const periods = ['2025 Q1-Q2', '2025 Q3-Q4', '2026-2027'];
         
         periods.forEach(period => {
             const cells = table.querySelectorAll(`td[data-period="${period}"] .etp-value`);
