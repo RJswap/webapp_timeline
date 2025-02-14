@@ -1,17 +1,15 @@
 // static/js/project/timeline.js
 
 document.addEventListener('DOMContentLoaded', function() {
-    const timelineContent = document.querySelector('.timeline-content');
-    const projectRows = document.querySelectorAll('.project-row');
-    const projectNames = document.querySelectorAll('.project-names .project-name');
+    const timelineRows = document.querySelectorAll('.timeline-row');
     
     // Créer la barre de toggles
     const streamToggles = document.createElement('div');
     streamToggles.className = 'stream-toggles';
     
     // Créer un toggle pour chaque projet
-    projectRows.forEach((row, index) => {
-        const projectName = projectNames[index].textContent.trim();
+    timelineRows.forEach((row) => {
+        const projectName = row.dataset.projectName;
         const toggleWrapper = document.createElement('div');
         toggleWrapper.className = 'stream-toggle';
         
@@ -40,7 +38,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Gestionnaire d'événements pour le toggle
         input.addEventListener('change', function() {
             const isVisible = this.checked;
-            toggleProjectVisibility(row, projectNames[index], isVisible);
+            toggleRowVisibility(row, isVisible);
             updatePositions();
         });
     });
@@ -49,32 +47,23 @@ document.addEventListener('DOMContentLoaded', function() {
     const timelineContainer = document.querySelector('.timeline-container');
     timelineContainer.insertBefore(streamToggles, timelineContainer.querySelector('.timeline-grid'));
     
-    function toggleProjectVisibility(row, nameElement, isVisible) {
+    function toggleRowVisibility(row, isVisible) {
         if (isVisible) {
-            row.style.display = 'grid';
-            row.style.height = 'auto';
+            row.classList.remove('hidden');
+            row.style.height = '';
             row.style.opacity = '1';
-            nameElement.style.display = 'flex';
-            nameElement.style.height = 'auto';
-            nameElement.style.opacity = '1';
         } else {
-            row.style.display = 'none';
+            row.classList.add('hidden');
             row.style.height = '0';
             row.style.opacity = '0';
-            nameElement.style.display = 'none';
-            nameElement.style.height = '0';
-            nameElement.style.opacity = '0';
         }
     }
     
     function updatePositions() {
-        // Mettre à jour la position des lignes visibles
-        let visibleIndex = 0;
-        projectRows.forEach((row, index) => {
-            if (row.style.display !== 'none') {
-                row.style.order = visibleIndex;
-                projectNames[index].style.order = visibleIndex;
-                visibleIndex++;
+        let currentOffset = 0;
+        timelineRows.forEach(row => {
+            if (!row.classList.contains('hidden')) {
+                currentOffset += row.offsetHeight + 16; // 16px pour le gap
             }
         });
     }

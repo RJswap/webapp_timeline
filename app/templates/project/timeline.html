@@ -13,13 +13,6 @@
     <!-- Les toggles seront insérés ici par JavaScript -->
     
     <div class="timeline-grid">
-        <!-- Colonne des noms de projets -->
-        <div class="project-names">
-            {% for project in projects %}
-            <div class="project-name">{{ project.name }}</div>
-            {% endfor %}
-        </div>
-
         <div class="timeline-main">
             <!-- En-tête avec les périodes -->
             <div class="periods-grid">
@@ -29,9 +22,10 @@
             </div>
 
             <!-- Contenu de la timeline -->
-            <div class="timeline-content">
+            <div class="timeline-rows-container">
                 {% for project in projects %}
-                <div class="project-row">
+                <div class="timeline-row" data-project-name="{{ project.name }}">
+                    <div class="project-name">{{ project.name }}</div>
                     <div class="project-tasks">
                         {% for task in project.tasks %}
                         <div class="task bg-{{ task.color }}"
