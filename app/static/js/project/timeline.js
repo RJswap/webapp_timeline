@@ -67,4 +67,18 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    document.querySelectorAll('.task').forEach(task => {
+        const left = task.style.left;
+        const width = task.style.width;
+        
+        console.log(`Task: ${task.textContent.trim()}`);
+        console.log(`Position CSS - left: ${left}, width: ${width}`);
+        console.log(`Container width: ${task.parentElement.offsetWidth}px`);
+        console.log('---');
+        
+        // Valider visuellement les positions
+        task.title = `Position: ${left} | Width: ${width}`;
+    });
+    
 });

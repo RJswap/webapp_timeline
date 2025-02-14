@@ -1,19 +1,41 @@
-/* timeline.css */
-
-.timeline-container {
-    background-color: white;
-    border-radius: 0.5rem;
-    padding: 2rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+/* Variables globales */
+:root {
+    --sidebar-width: 200px;
+    --row-height: 3.5rem;
+    --task-height: calc(100% - 1rem);
+    --grid-columns: 5;
 }
 
-/* Stream Toggle Switches */
+/* Reset du conteneur principal */
+.main-content {
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+/* Conteneur de la timeline */
+.timeline-container {
+    background-color: white;
+    padding: 1rem;
+    width: 100%;
+}
+
+/* En-tête de la page */
+.page-title {
+    padding: 0 2rem;
+    margin-bottom: 1rem;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+/* Toggles des streams */
 .stream-toggles {
     display: flex;
     flex-wrap: wrap;
     gap: 1rem;
-    margin-bottom: 2rem;
-    padding: 1rem;
+    margin-bottom: 1rem;
+    padding: 1rem 2rem;
     background-color: #f8fafc;
     border-radius: 0.5rem;
 }
@@ -25,6 +47,7 @@
     cursor: pointer;
 }
 
+/* Style du switch */
 .switch {
     position: relative;
     display: inline-block;
@@ -41,18 +64,15 @@
 .slider {
     position: absolute;
     cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0;
     background-color: #e5e7eb;
     transition: .3s;
     border-radius: 24px;
 }
 
 .slider:before {
-    position: absolute;
     content: "";
+    position: absolute;
     height: 18px;
     width: 18px;
     left: 3px;
@@ -70,28 +90,16 @@ input:checked + .slider:before {
     transform: translateX(24px);
 }
 
-/* Timeline Layout */
+/* Structure principale de la timeline */
 .timeline-grid {
-    width: 100%;
-    min-width: 0;
-}
-
-.timeline-main {
     width: 100%;
     overflow-x: auto;
 }
 
-.periods-grid {
-    display: grid;
-    grid-template-columns: repeat(6, minmax(150px, 1fr));
-    background-color: var(--primary-color);
-    color: white;
-    border-radius: 0.25rem;
-    overflow: hidden;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    margin-left: 9rem; /* 8rem (largeur colonne titre) + 1rem (gap) */
+.timeline-main {
+    width: 100%;
+    min-width: 100%;
+    padding: 0 1rem;
 }
 
 .period {
@@ -101,7 +109,22 @@ input:checked + .slider:before {
     font-size: 0.875rem;
 }
 
-/* Timeline content */
+/* Grille des périodes */
+.periods-grid {
+    display: grid; 
+    grid-template-columns: var(--sidebar-width) repeat(var(--grid-columns), 1fr);
+    background-color: var(--primary-color);
+    gap: 0;
+    color: white;
+    border-radius: 0.25rem;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+
+
+/* Conteneur des lignes */
 .timeline-rows-container {
     display: flex;
     flex-direction: column;
@@ -109,58 +132,89 @@ input:checked + .slider:before {
     margin-top: 1rem;
 }
 
+/* Ligne de projet */
 .timeline-row {
     display: grid;
-    grid-template-columns: 8rem minmax(0, 1fr);
-    gap: 1rem;
-    min-height: 3.5rem;
+    grid-template-columns: var(--sidebar-width) 1fr;
+    min-height: var(--row-height);
+    margin-bottom: 0.5rem;
 }
 
-
+/* Nom du projet */
 .project-name {
     font-weight: 600;
-    padding: 0.5rem;
+    padding: 0.5rem 1rem;
     background-color: #f9fafb;
-    border-radius: 0.25rem;
-    height: 100%;
+    border-radius: 0.25rem 0 0 0.25rem;
     display: flex;
     align-items: center;
 }
 
+/* Conteneur des tâches */
 .project-tasks {
-    display: grid;
-    grid-template-columns: repeat(6, minmax(150px, 1fr));
-    gap: 0.25rem;
+    position: relative;
     background-color: #f9fafb;
+    border-radius: 0 0.25rem 0.25rem 0;
     padding: 0.5rem;
-    border-radius: 0.25rem;
-    min-height: 100%;
+    min-height: var(--row-height);
+    width: 100%;
 }
 
+/* Style des lignes de la grille */
+.project-tasks::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(
+        to right,
+        rgba(0, 0, 0, 0.1) 1px,
+        transparent 1px
+    );
+    background-size: calc(100% / var(--grid-columns)) 100%;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Style des tâches */
 .task {
+    position: absolute;
+    max-width: 100%; /* Cela pourrait limiter la largeur */
+    height: var(--task-height);
     padding: 0.5rem;
     border-radius: 0.25rem;
     font-size: 0.75rem;
     color: white;
     cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    height: 100%;
     display: flex;
     align-items: center;
+    transition: transform 0.2s, box-shadow 0.2s;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    z-index: 1;
 }
 
 .task:hover {
     transform: translateY(-2px);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    overflow: visible;
-    white-space: normal;
-    z-index: 1;
+    z-index: 2;
 }
 
-/* Milestones styles */
+.task:hover::after {
+    content: attr(data-dates);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    z-index: 1000;
+}
+
+/* Styles des jalons */
 .milestones {
     margin-top: 2rem;
 }
@@ -197,7 +251,7 @@ input:checked + .slider:before {
     font-weight: 500;
 }
 
-/* Animation pour masquer/afficher */
+/* Animation pour masquer/afficher les lignes */
 .timeline-row {
     transition: all 0.3s ease;
 }
@@ -206,7 +260,7 @@ input:checked + .slider:before {
     display: none;
 }
 
-/* Task colors */
+/* Couleurs des tâches */
 .bg-blue-600 { background-color: #2563eb; }
 .bg-blue-500 { background-color: #3b82f6; }
 .bg-purple-600 { background-color: #9333ea; }
@@ -224,3 +278,18 @@ input:checked + .slider:before {
 .bg-teal-500 { background-color: #14b8a6; }
 .bg-gray-600 { background-color: #4b5563; }
 .bg-gray-500 { background-color: #6b7280; }
+
+/* Responsive */
+@media (max-width: 1024px) {
+    :root {
+        --sidebar-width: 150px;
+    }
+    
+    .project-name {
+        font-size: 0.875rem;
+    }
+    
+    .task {
+        font-size: 0.75rem;
+    }
+}

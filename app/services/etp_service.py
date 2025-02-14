@@ -1,5 +1,6 @@
 from collections import defaultdict
 from typing import List, Dict, Tuple
+from datetime import date
 from app.models.project import Project
 from app.models.etp_entry import EtpEntry
 from app.constants import TimeConstants
@@ -17,18 +18,20 @@ class EtpService:
         return entry.etp_value if entry else None
 
     @staticmethod
-    def get_period_for_task(task_start: int) -> str:
-        """Détermine la période correspondant au début d'une tâche"""
-        period_num = (task_start + 1) // 2
-        return TimeConstants.PERIODS_MAPPING.get(period_num)
+    def get_period_for_date(target_date: date) -> str:
+        """Détermine la période correspondant à une date donnée"""
+        if target_date.year == 2025:
+            if target_date.month <= 6:
+                return "2025 Q1-Q2"
+            else:
+                return "2025 Q3-Q4"
+        else:
+            return "2026-2027"
 
     @staticmethod
-    def get_task_etp(project_name: str, task_start: int, default_etp: float) -> float:
-        """Récupère l'ETP pour une tâche spécifique"""
-        period = EtpService.get_period_for_task(task_start)
-        if not period:
-            return default_etp
-            
+    def get_task_etp_by_date(project_name: str, task_date: date, default_etp: float) -> float:
+        """Récupère l'ETP pour une tâche à une date spécifique"""
+        period = EtpService.get_period_for_date(task_date)
         stored_etp = EtpService.get_stored_etp(project_name, period)
         return stored_etp if stored_etp is not None else default_etp
 
@@ -45,18 +48,26 @@ class EtpService:
             stored_etps_dict = {entry.period: entry.etp_value for entry in stored_etps}
             
             for task in project.tasks:
-                start_period = (task.start + 1) // 2
-                width_periods = (task.width + 1) // 2
+                period_start = EtpService.get_period_for_date(task.start_date)
+                period_end = EtpService.get_period_for_date(task.end_date)
                 max_etp = max(max_etp, task.etp)
                 
-                for period in range(start_period, start_period + width_periods):
-                    period_name = TimeConstants.PERIODS_MAPPING.get(period)
-                    if period_name:
-                        stored_value = stored_etps_dict.get(period_name)
-                        if stored_value is not None:
-                            project_etps[period_name] = stored_value
-                        else:
-                            project_etps[period_name] = max(project_etps[period_name], task.etp)
+                # Assigner l'ETP à toutes les périodes concernées
+                for period in [period_start, period_end]:
+                    stored_value = stored_etps_dict.get(period)
+                    if stored_value is not None:
+                        project_etps[period] = stored_value
+                    else:
+                        project_etps[period] = max(project_etps[period], task.etp)
+                
+                # Si la tâche s'étend sur 2025 Q3-Q4 et commence en Q1-Q2 ou finit en 2026-2027
+                if period_start != period_end and period_start == "2025 Q1-Q2":
+                    middle_period = "2025 Q3-Q4"
+                    stored_value = stored_etps_dict.get(middle_period)
+                    if stored_value is not None:
+                        project_etps[middle_period] = stored_value
+                    else:
+                        project_etps[middle_period] = max(project_etps[middle_period], task.etp)
             
             project_row = {
                 "name": project.name,

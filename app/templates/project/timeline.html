@@ -7,52 +7,40 @@
 {% endblock %}
 
 {% block content %}
-<div class="timeline-container">
-    <h1 class="page-title">Project Timeline</h1>
-    
-    <!-- Les toggles seront insérés ici par JavaScript -->
-    
-    <div class="timeline-grid">
-        <div class="timeline-main">
-            <!-- En-tête avec les périodes -->
-            <div class="periods-grid">
-                {% for period in periods %}
-                <div class="period">{{ period }}</div>
-                {% endfor %}
-            </div>
-
-            <!-- Contenu de la timeline -->
-            <div class="timeline-rows-container">
-                {% for project in projects %}
-                <div class="timeline-row" data-project-name="{{ project.name }}">
-                    <div class="project-name">{{ project.name }}</div>
-                    <div class="project-tasks">
-                        {% for task in project.tasks %}
-                        <div class="task bg-{{ task.color }}"
-                             style="grid-column: {{ task.start }} / span {{ task.width }};"
-                             data-task-info="{{ task.text }}">
-                            {{ task.text }}
-                        </div>
-                        {% endfor %}
-                    </div>
+    <div class="timeline-container">
+        <h1 class="page-title">Project Timeline</h1>
+        
+        <div class="timeline-grid">
+            <div class="timeline-main">
+                <div class="periods-grid">
+                    <div class="period"></div>
+                    {% for period in periods %}
+                    <div class="period">{{ period }}</div>
+                    {% endfor %}
                 </div>
-                {% endfor %}
-            </div>
 
-            <!-- Jalons clés -->
-            <div class="milestones">
-                <div class="milestone-container">
-                    {% for milestone in milestones %}
-                    <div class="milestone {{ milestone.position }}">
-                        <div class="milestone-dot"></div>
-                        <div class="milestone-text">{{ milestone.text }}</div>
+                <div class="timeline-rows-container">
+                    {% for project in projects %}
+                    <div class="timeline-row" data-project-name="{{ project.name }}">
+                        <div class="project-name">{{ project.name }}</div>
+                        <div class="project-tasks">
+                            {% for task in project.tasks %}
+                            {% set start_percent = task.start %}
+                            {% set width_percent = task.width %}
+                            <div class="task bg-{{ task.color }}"
+                                style="left: {{ start_percent }}%; width: {{ width_percent }}%;"
+                                data-task-info="{{ task.text }}"
+                                data-dates="{{ task.start_date }} - {{ task.end_date }}">
+                                {{ task.text }}
+                            </div>
+                            {% endfor %}
+                        </div>
                     </div>
                     {% endfor %}
                 </div>
             </div>
         </div>
     </div>
-</div>
 {% endblock %}
 
 {% block extra_js %}

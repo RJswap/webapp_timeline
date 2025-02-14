@@ -151,11 +151,11 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     // Gestion des erreurs globales
-    window.onerror = function(msg, url, lineNo, columnNo, error) {
-        console.error('Error: ', msg, url, lineNo, columnNo, error);
-        notifications.show('Une erreur est survenue', 'error');
-        return false;
-    };
+    //window.onerror = function(msg, url, lineNo, columnNo, error) {
+        //console.error('Error: ', msg, url, lineNo, columnNo, error);
+        //notifications.show('Une erreur est survenue', 'error');
+        //return false;
+    //};
 
     // Initialisation des composants
     const init = () => {
