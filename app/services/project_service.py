@@ -22,8 +22,8 @@ class ProjectService:
         return Project.query.filter_by(name=name).first()
     
     @staticmethod
-    def create_project(name: str) -> Project:
-        project = Project(name=name)
+    def create_project(name: str, color_scheme: str = 'blue') -> Project:
+        project = Project(name=name, color_scheme=color_scheme)
         db.session.add(project)
         try:
             db.session.commit()
@@ -40,45 +40,34 @@ class ProjectService:
         end_date: date,
         color: str,
         etp: float = 1.0
-    ) -> Task:
-        task = Task(
-            project_id=project_id,
-            text=text,
-            start_date=start_date,
-            end_date=end_date,
-            color=color,
-            etp=etp
-        )
-        db.session.add(task)
-        db.session.commit()
-        return task
-    
-    @staticmethod
-    def update_task(
-        task_id: int,
-        text: Optional[str] = None,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
-        color: Optional[str] = None,
-        etp: Optional[float] = None
     ) -> Optional[Task]:
-        task = Task.query.get(task_id)
-        if not task:
-            return None
+        try:
+            print(f"Creating task in service: {project_id}, {text}, {start_date}-{end_date}, {color}")
+            task = Task(
+                project_id=project_id,
+                text=text,
+                start_date=start_date,
+                end_date=end_date,
+                color=color,
+                etp=etp
+            )
             
-        if text is not None:
-            task.text = text
-        if start_date is not None:
-            task.start_date = start_date
-        if end_date is not None:
-            task.end_date = end_date
-        if color is not None:
-            task.color = color
-        if etp is not None:
-            task.etp = etp
+            db.session.add(task)
+            db.session.commit()
             
-        db.session.commit()
-        return task
+            # Vérifier que la tâche a bien été créée
+            created_task = Task.query.get(task.id)
+            if created_task:
+                print(f"Task created successfully with ID: {created_task.id}")
+                return created_task
+            else:
+                print("Task was not created properly")
+                return None
+                
+        except Exception as e:
+            print(f"Error in create_task: {str(e)}")
+            db.session.rollback()
+            raise
     
     @staticmethod
     def delete_task(task_id: int) -> bool:

@@ -25,10 +25,8 @@
                         <div class="project-name">{{ project.name }}</div>
                         <div class="project-tasks">
                             {% for task in project.tasks %}
-                            {% set start_percent = task.start %}
-                            {% set width_percent = task.width %}
                             <div class="task bg-{{ task.color }}"
-                                style="left: {{ start_percent }}%; width: {{ width_percent }}%;"
+                                style="left: {{ task.start }}%; width: {{ task.width }}%;"
                                 data-task-info="{{ task.text }}"
                                 data-dates="{{ task.start_date }} - {{ task.end_date }}">
                                 {{ task.text }}
@@ -40,6 +38,86 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <div id="newProjectModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Nouveau Projet</h2>
+                <span class="close">&times;</span>
+            </div>
+            <form id="newProjectForm">
+                <div class="form-group">
+                    <label for="projectName">Nom du projet</label>
+                    <input type="text" id="projectName" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="colorScheme">Schéma de couleur</label>
+                    <select id="colorScheme" name="colorScheme" required>
+                        <option value="blue">Bleu</option>
+                        <option value="purple">Violet</option>
+                        <option value="green">Vert</option>
+                        <option value="yellow">Jaune</option>
+                        <option value="red">Rouge</option>
+                        <option value="indigo">Indigo</option>
+                        <option value="teal">Teal</option>
+                        <option value="gray">Gris</option>
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn-primary">Créer</button>
+                    <button type="button" class="btn-secondary close-modal">Annuler</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Modal Nouvelle Tâche -->
+    <div id="newTaskModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Nouvelle Tâche</h2>
+                <span class="close">&times;</span>
+            </div>
+            <form id="newTaskForm">
+                <div class="form-group">
+                    <label for="taskProject">Projet</label>
+                    <select id="taskProject" name="project_id" required>
+                        <!-- Rempli dynamiquement -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="taskText">Description</label>
+                    <input type="text" id="taskText" name="text" required>
+                </div>
+                <div class="form-group">
+                    <label for="taskStartDate">Date de début</label>
+                    <input type="date" id="taskStartDate" name="start_date" required>
+                </div>
+                <div class="form-group">
+                    <label for="taskEndDate">Date de fin</label>
+                    <input type="date" id="taskEndDate" name="end_date" required>
+                </div>
+                <div class="form-group">
+                    <label for="taskEtp">ETP</label>
+                    <input type="number" id="taskEtp" name="etp" step="0.1" min="0" value="1.0" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn-primary">Créer</button>
+                    <button type="button" class="btn-secondary close-modal">Annuler</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Boutons d'action -->
+    <div class="action-buttons">
+        <button id="addProjectBtn" class="btn-primary">
+            <i class="fas fa-plus"></i> Nouveau Projet
+        </button>
+        <button id="addTaskBtn" class="btn-primary">
+            <i class="fas fa-plus"></i> Nouvelle Tâche
+        </button>
     </div>
 {% endblock %}
 
