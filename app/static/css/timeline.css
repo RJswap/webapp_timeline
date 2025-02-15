@@ -478,3 +478,54 @@ input:checked + .slider:before {
     background-color: var(--primary-color);
     color: white;
 }
+
+
+.task:hover::after {
+    content: none;
+}
+
+.task:hover .task-tooltip {
+    display: block;
+}
+
+.task-tooltip {
+    display: none;
+    position: absolute; /* Revenir à absolute pour le positionnement relatif à la tâche */
+    bottom: 100%; /* Positionner le bas du tooltip au niveau du haut de la tâche */
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 8px; /* Réduire le padding global */
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    white-space: pre-wrap;
+    min-width: 200px;
+    max-width: 400px;
+    z-index: 1000;
+    pointer-events: none;
+    margin-bottom: 4px; /* Petit espace entre le tooltip et la tâche */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.task-tooltip .dates {
+    color: #93c5fd;
+    padding: 0; /* Supprimer tout padding */
+    margin: 0; /* Supprimer toute marge */
+    line-height: 1.2; /* Réduire la hauteur de ligne */
+}
+
+.task-tooltip .task-text {
+    padding: 4px 0; /* Ajouter un peu d'espace vertical autour du texte */
+    margin: 0;
+    line-height: 1.2;
+}
+
+.task-tooltip .comment {
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    padding-top: 4px;
+    margin-top: 4px;
+    font-style: italic;
+    color: #cbd5e1;
+    line-height: 1.2;
+}

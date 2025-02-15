@@ -133,7 +133,8 @@ def create_task():
             start_date=datetime.strptime(data['start_date'], '%Y-%m-%d').date(),
             end_date=datetime.strptime(data['end_date'], '%Y-%m-%d').date(),
             color=None,  # La couleur sera déterminée par le service
-            etp=float(data.get('etp', 1.0))
+            etp=float(data.get('etp', 1.0)),
+            comment=data.get('comment')
         )
         
         if not task:
@@ -156,6 +157,7 @@ def update_task(task_id):
             
         # Mise à jour des champs
         task.text = data.get('text', task.text)
+        task.comment = data.get('comment', task.comment) 
         task.start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date()
         task.end_date = datetime.strptime(data['end_date'], '%Y-%m-%d').date()
         task.etp = float(data.get('etp', task.etp))

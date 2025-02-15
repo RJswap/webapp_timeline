@@ -120,6 +120,7 @@ const TimelineManager = {
                     id: task.dataset.taskId,
                     projectId: task.closest('.timeline-row').dataset.projectId,
                     text: task.dataset.taskInfo,
+                    comment: task.dataset.comment,
                     startDate: task.dataset.startDate,
                     endDate: task.dataset.endDate,
                     etp: task.dataset.etp
@@ -316,6 +317,7 @@ const ModalManager = {
         document.getElementById('editTaskId').value = taskData.id;
         document.getElementById('editTaskProject').value = taskData.projectId;
         document.getElementById('editTaskText').value = taskData.text;
+        document.getElementById('editTaskComment').value = taskData.comment || '';
         document.getElementById('editTaskStartDate').value = taskData.startDate;
         document.getElementById('editTaskEndDate').value = taskData.endDate;
         document.getElementById('editTaskEtp').value = taskData.etp;

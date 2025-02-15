@@ -7,6 +7,7 @@ class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
     text = db.Column(db.String(200), nullable=False)
+    comment = db.Column(db.Text)
     start_date = db.Column(db.Date, nullable=False)
     end_date = db.Column(db.Date, nullable=False)
     color = db.Column(db.String(50), nullable=False)
@@ -51,6 +52,7 @@ class Task(db.Model):
             'id': self.id,
             'project_id': self.project_id,
             'text': self.text,
+            'comment': self.comment or '',
             'start_date': self.start_date.strftime('%d/%m/%Y'),  # Format de date pour l'affichage
             'end_date': self.end_date.strftime('%d/%m/%Y'),      # Format de date pour l'affichage
             'dates': f"{self.start_date.strftime('%d/%m/%Y')} - {self.end_date.strftime('%d/%m/%Y')}", # Pour l'infobulle

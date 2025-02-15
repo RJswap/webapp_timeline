@@ -1,26 +1,70 @@
-### constants.py
+### run.py
 ```py
-class TimeConstants:
-    PERIODS_MAPPING = {
-        1: "2025 Q1-Q2",
-        2: "2025 Q3-Q4",
-        3: "2026-2027"
-    }
+from app import create_app, db
+from app.services.init_data import init_db_data
+import logging
+import os
+
+# Configuration du logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+app = create_app()
+
+# Nom du fichier de la base de données
+DB_FILE = 'instance/project_manager.db'
+
+if __name__ == '__main__':
+    with app.app_context():
+        try:
+            # Vérifie si la base de données existe déjà
+            db_exists = os.path.exists(DB_FILE)
+            
+            if not db_exists:
+                logger.info("Base de données non trouvée, création initiale...")
+                db.create_all()
+                logger.info("Tables créées avec succès")
+                
+                logger.info("Initialisation avec les données de test...")
+                init_db_data()
+                logger.info("Données de test initialisées avec succès")
+            else:
+                logger.info("Base de données existante trouvée, conservation des données...")
+        
+        except Exception as e:
+            logger.error(f"Une erreur est survenue : {str(e)}")
+            raise e
+        
+    logger.info("Démarrage de l'application Flask...")
+    app.run(debug=True)
+```
+
+### __init__.py
+```py
+from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+from app.config import DevelopmentConfig
+
+db = SQLAlchemy()
+migrate_manager = Migrate()  # Renommé pour éviter le conflit
+
+def create_app(config_class=DevelopmentConfig):
+    app = Flask(__name__)
+    app.config.from_object(config_class)
     
-    PERIODS_DISPLAY = [
-        "2025 Q1",
-        "2025 Q2",
-        "2025 Q3",
-        "2025 Q4",
-        "2026-2027"
-    ]
+    # Initialize database
+    db.init_app(app)
     
-    MILESTONES = [
-        {"position": "left-1/3", "text": "RFI"},
-        {"position": "left-1/2", "text": "RFP"},
-        {"position": "left-2/3", "text": "Pilot"},
-        {"position": "right-1/6", "text": "Déploiement"}
-    ]
+    # Initialize Flask-Migrate
+    migrate_manager.init_app(app, db)
+    
+    # Register blueprints
+    from app.routes import main, project
+    app.register_blueprint(main)
+    app.register_blueprint(project)
+    
+    return app
 ```
 
 ### base.html
@@ -60,214 +104,263 @@ class TimeConstants:
 
 ```
 
-### base.js
-```js
-// base.js - Fonctionnalités communes à toute l'application
+### timeline.html
+```html
+{% extends "base.html" %}
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Configuration des variables globales
-    window.APP = {
-        config: {
-            animationDuration: 300,
-            dateFormat: 'DD/MM/YYYY',
-            apiEndpoint: '/api'
-        }
-    };
+{% block title %}Timeline - Project Manager{% endblock %}
 
-    // Gestion de la navigation active
-    const handleActiveNavigation = () => {
-        const currentPath = window.location.pathname;
-        document.querySelectorAll('.nav-links a').forEach(link => {
-            if (link.getAttribute('href') === currentPath) {
-                link.classList.add('active');
-            }
-        });
-    };
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/timeline.css') }}">
+{% endblock %}
 
-    // Gestion des notifications
-    const notifications = {
-        container: null,
+{% block content %}
+    <div class="timeline-container">
+        <h1 class="page-title">Project Timeline</h1>
         
-        init() {
-            this.container = document.createElement('div');
-            this.container.className = 'notifications-container';
-            document.body.appendChild(this.container);
-        },
-
-        show(message, type = 'info') {
-            const notification = document.createElement('div');
-            notification.className = `notification notification-${type}`;
-            notification.textContent = message;
-            
-            this.container.appendChild(notification);
-            
-            // Animation d'entrée
-            setTimeout(() => {
-                notification.classList.add('show');
-            }, 10);
-
-            // Auto-suppression après 5 secondes
-            setTimeout(() => {
-                notification.classList.remove('show');
-                setTimeout(() => {
-                    notification.remove();
-                }, 300);
-            }, 5000);
-        }
-    };
-
-    // Gestion du thème
-    const themeManager = {
-        init() {
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            this.setTheme(savedTheme);
-            
-            // Écouteur pour le bouton de changement de thème (si présent)
-            const themeToggle = document.querySelector('.theme-toggle');
-            if (themeToggle) {
-                themeToggle.addEventListener('click', () => {
-                    const newTheme = document.body.classList.contains('dark-theme') ? 'light' : 'dark';
-                    this.setTheme(newTheme);
-                });
-            }
-        },
-
-        setTheme(theme) {
-            document.body.classList.remove('light-theme', 'dark-theme');
-            document.body.classList.add(`${theme}-theme`);
-            localStorage.setItem('theme', theme);
-        }
-    };
-
-    // Utilitaires pour les dates
-    const dateUtils = {
-        formatDate(date) {
-            return new Intl.DateTimeFormat('fr-FR').format(date);
-        },
-
-        formatDateTime(date) {
-            return new Intl.DateTimeFormat('fr-FR', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit'
-            }).format(date);
-        }
-    };
-
-    // Gestion des formulaires
-    const formManager = {
-        init() {
-            document.querySelectorAll('form').forEach(form => {
-                form.addEventListener('submit', this.handleSubmit.bind(this));
-            });
-        },
-
-        handleSubmit(event) {
-            const form = event.target;
-            
-            // Désactiver le bouton submit pendant le traitement
-            const submitButton = form.querySelector('[type="submit"]');
-            if (submitButton) {
-                submitButton.disabled = true;
-            }
-
-            // Réactiver le bouton après le traitement
-            setTimeout(() => {
-                if (submitButton) {
-                    submitButton.disabled = false;
-                }
-            }, 1000);
-        },
-
-        validateForm(form) {
-            let isValid = true;
-            const inputs = form.querySelectorAll('input[required], select[required], textarea[required]');
-            
-            inputs.forEach(input => {
-                if (!input.value.trim()) {
-                    isValid = false;
-                    this.showError(input, 'Ce champ est requis');
-                } else {
-                    this.clearError(input);
-                }
-            });
-
-            return isValid;
-        },
-
-        showError(input, message) {
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'form-error';
-            errorDiv.textContent = message;
-            input.classList.add('error');
-            input.parentNode.appendChild(errorDiv);
-        },
-
-        clearError(input) {
-            input.classList.remove('error');
-            const errorDiv = input.parentNode.querySelector('.form-error');
-            if (errorDiv) {
-                errorDiv.remove();
-            }
-        }
-    };
-
-    // Gestion des erreurs globales
-    //window.onerror = function(msg, url, lineNo, columnNo, error) {
-        //console.error('Error: ', msg, url, lineNo, columnNo, error);
-        //notifications.show('Une erreur est survenue', 'error');
-        //return false;
-    //};
-
-    // Initialisation des composants
-    const init = () => {
-        handleActiveNavigation();
-        notifications.init();
-        themeManager.init();
-        formManager.init();
+        <!-- Boutons d'action -->
+        <div class="action-buttons">
+            <button id="addProjectBtn" class="btn-primary">
+                <i class="fas fa-plus"></i> Nouveau Projet
+            </button>
+            <button id="addTaskBtn" class="btn-primary">
+                <i class="fas fa-plus"></i> Nouvelle Tâche
+            </button>
+        </div>
         
-        // Exposer les utilitaires globalement
-        window.APP = {
-            ...window.APP,
-            notifications,
-            dateUtils,
-            formManager
-        };
-    };
+        <div class="timeline-grid">
+            <div class="timeline-main">
+                <div class="periods-grid">
+                    <div class="period"></div>
+                    {% for period in periods %}
+                    <div class="period">{{ period }}</div>
+                    {% endfor %}
+                </div>
 
-    // Lancer l'initialisation
-    init();
-});
+                <div class="timeline-rows-container">
+                    {% for project in projects %}
+                    <div class="timeline-row" 
+                         data-project-name="{{ project.name }}" 
+                         data-project-id="{{ project.id }}"
+                         data-color-scheme="{{ project.color_scheme }}">
+                        <div class="project-name">{{ project.name }}</div>
+                        <div class="project-tasks">
+                            {% for task in project.tasks %}
+                            <div class="task bg-{{ task.color }}"
+                                style="left: {{ task.start }}%; width: {{ task.width }}%;"
+                                data-task-id="{{ task.id }}"
+                                data-task-info="{{ task.text }}"
+                                data-comment="{{ task.comment }}"
+                                data-dates="{{ task.dates }}"
+                                data-start-date="{{ task.raw_start_date }}"
+                                data-end-date="{{ task.raw_end_date }}"
+                                data-etp="{{ task.etp }}">
+                                {{ task.text }}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="newProjectModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="projectModalTitle">Nouveau Projet</h2>
+                <span class="close">&times;</span>
+            </div>
+            <form id="projectForm">
+                <input type="hidden" id="projectId" name="project_id" value="">
+                
+                <div class="form-group">
+                    <label for="projectName">Nom du projet</label>
+                    <input type="text" id="projectName" name="name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="colorScheme">Schéma de couleur</label>
+                    <select id="colorScheme" name="colorScheme" required>
+                        <option value="blue">Bleu</option>
+                        <option value="purple">Violet</option>
+                        <option value="green">Vert</option>
+                        <option value="yellow">Jaune</option>
+                        <option value="red">Rouge</option>
+                        <option value="indigo">Indigo</option>
+                        <option value="teal">Teal</option>
+                        <option value="gray">Gris</option>
+                    </select>
+                </div>
+                
+                <div class="modal-footer">
+                    <button type="button" id="deleteProjectBtn" class="btn-danger" style="display: none;">
+                        Supprimer le projet
+                    </button>
+                    <div class="action-buttons">
+                        <button type="submit" id="submitProjectBtn" class="btn-primary">Créer</button>
+                        <button type="button" class="btn-secondary close-modal">Annuler</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Modal Nouvelle Tâche -->
+    <div id="newTaskModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Nouvelle Tâche</h2>
+                <span class="close">&times;</span>
+            </div>
+            <form id="newTaskForm">
+                <div class="form-group">
+                    <label for="taskProject">Projet</label>
+                    <select id="taskProject" name="project_id" required>
+                        <!-- Rempli dynamiquement -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="taskText">Description</label>
+                    <input type="text" id="taskText" name="text" required>
+                </div>
+                <div class="form-group">
+                    <label for="taskComment">Commentaire</label>
+                    <textarea id="taskComment" name="comment" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="taskStartDate">Date de début</label>
+                    <input type="date" id="taskStartDate" name="start_date" required>
+                </div>
+                <div class="form-group">
+                    <label for="taskEndDate">Date de fin</label>
+                    <input type="date" id="taskEndDate" name="end_date" required>
+                </div>
+                <div class="form-group">
+                    <label for="taskEtp">ETP</label>
+                    <input type="number" id="taskEtp" name="etp" step="0.1" min="0" value="1.0" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn-primary">Créer</button>
+                    <button type="button" class="btn-secondary close-modal">Annuler</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="editTaskModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Modifier la Tâche</h2>
+                <span class="close">&times;</span>
+            </div>
+            <form id="editTaskForm">
+                <input type="hidden" id="editTaskId" name="task_id">
+                <div class="form-group">
+                    <label for="editTaskProject">Projet</label>
+                    <select id="editTaskProject" name="project_id" required disabled>
+                        <!-- Rempli dynamiquement -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="editTaskText">Description</label>
+                    <input type="text" id="editTaskText" name="text" required>
+                </div>
+                <div class="form-group">
+                    <label for="editTaskComment">Commentaire</label>
+                    <textarea id="editTaskComment" name="comment" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="editTaskStartDate">Date de début</label>
+                    <input type="date" id="editTaskStartDate" name="start_date" required>
+                </div>
+                <div class="form-group">
+                    <label for="editTaskEndDate">Date de fin</label>
+                    <input type="date" id="editTaskEndDate" name="end_date" required>
+                </div>
+                <div class="form-group">
+                    <label for="editTaskEtp">ETP</label>
+                    <input type="number" id="editTaskEtp" name="etp" step="0.1" min="0" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn-primary">Enregistrer</button>
+                    <button type="button" class="btn-danger" id="deleteTaskBtn">Supprimer</button>
+                    <button type="button" class="btn-secondary close-modal">Annuler</button>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/project/timeline.js') }}"></script>
+{% endblock %}
 ```
 
-### __init__.py
-```py
-from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
-from app.config import DevelopmentConfig
+### etp_table.html
+```html
+{% extends "base.html" %}
 
-db = SQLAlchemy()
-migrate_manager = Migrate()  # Renommé pour éviter le conflit
+{% block title %}ETP Table - Project Manager{% endblock %}
 
-def create_app(config_class=DevelopmentConfig):
-    app = Flask(__name__)
-    app.config.from_object(config_class)
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/project/etp_table.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="etp-container">
+    <h1 class="page-title">Resource Allocation (ETP)</h1>
     
-    # Initialize database
-    db.init_app(app)
-    
-    # Initialize Flask-Migrate
-    migrate_manager.init_app(app, db)
-    
-    # Register blueprints
-    from app.routes import main, project
-    app.register_blueprint(main)
-    app.register_blueprint(project)
-    
-    return app
+    <div class="etp-table-container">
+        <table class="etp-table">
+            <thead>
+                <tr>
+                    <th>Stream</th>
+                    <th>2025 Q1-Q2</th>
+                    <th>2025 Q3-Q4</th>
+                    <th>2026-2027</th>
+                    <th>ETP Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in etp_data %}
+                <tr data-project="{{ row.name }}">
+                    <td>{{ row.name }}</td>
+                    <td class="text-center editable-cell" data-period="2025 Q1-Q2">
+                        <span class="etp-value">{{ "%.2f"|format(row["2025 Q1-Q2"]) }}</span>
+                    </td>
+                    <td class="text-center editable-cell" data-period="2025 Q3-Q4">
+                        <span class="etp-value">{{ "%.2f"|format(row["2025 Q3-Q4"]) }}</span>
+                    </td>
+                    <td class="text-center editable-cell" data-period="2026-2027">
+                        <span class="etp-value">{{ "%.2f"|format(row["2026-2027"]) }}</span>
+                    </td>
+                    <td class="text-center row-total">{{ "%.2f"|format(row.total) }}</td>
+                </tr>
+                {% endfor %}
+                <tr class="total-row">
+                    <td class="bold">Total ETP by period</td>
+                    <td class="text-center period-total" data-period="2025 Q1-Q2">
+                        {{ "%.2f"|format(period_totals["2025 Q1-Q2"]) }}
+                    </td>
+                    <td class="text-center period-total" data-period="2025 Q3-Q4">
+                        {{ "%.2f"|format(period_totals["2025 Q3-Q4"]) }}
+                    </td>
+                    <td class="text-center period-total" data-period="2026-2027">
+                        {{ "%.2f"|format(period_totals["2026-2027"]) }}
+                    </td>
+                    <td class="text-center grand-total">{{ "%.2f"|format(total_max_etp) }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/project/etp_table.js') }}"></script>
+{% endblock %}
 ```
 
 ### __init__.py
@@ -276,443 +369,6 @@ from .project_service import ProjectService
 from .etp_service import EtpService
 
 __all__ = ['ProjectService', 'EtpService']
-```
-
-### timeline.js
-```js
-// Gestionnaire de la timeline
-const TimelineManager = {
-    init() {
-        this.timelineRows = document.querySelectorAll('.timeline-row');
-        this.setupStreamToggles();
-        this.validateTaskPositions();
-        this.setupProjectButtons();
-        this.setupTaskButtons();
-    },
-
-    setupStreamToggles() {
-        const streamToggles = document.createElement('div');
-        streamToggles.className = 'stream-toggles';
-        
-        this.timelineRows.forEach((row) => {
-            const toggleWrapper = this.createToggle(row);
-            streamToggles.appendChild(toggleWrapper);
-        });
-        
-        const timelineContainer = document.querySelector('.timeline-container');
-        timelineContainer.insertBefore(streamToggles, timelineContainer.querySelector('.timeline-grid'));
-    },
-
-    setupProjectButtons() {
-        // Gérer le bouton "Nouveau Projet"
-        const addProjectBtn = document.getElementById('addProjectBtn');
-        if (addProjectBtn) {
-            addProjectBtn.addEventListener('click', () => {
-                ModalManager.openNewProjectModal();
-            });
-        }
-
-        // Gérer les clics sur les noms de projets
-        document.querySelectorAll('.project-name').forEach(projectName => {
-            projectName.addEventListener('click', (e) => {
-                e.preventDefault();
-                const projectId = projectName.closest('.timeline-row').dataset.projectId;
-                const projectTitle = projectName.textContent.trim();
-                const colorScheme = projectName.closest('.timeline-row').dataset.colorScheme || 'blue';
-                ModalManager.openProjectEditModal(projectId, projectTitle, colorScheme);
-            });
-        });
-    },
-
-    createToggle(row) {
-        const projectName = row.dataset.projectName;
-        const toggleWrapper = document.createElement('div');
-        toggleWrapper.className = 'stream-toggle';
-        
-        const label = document.createElement('label');
-        label.className = 'switch';
-        
-        const input = document.createElement('input');
-        input.type = 'checkbox';
-        input.checked = true;
-        
-        const slider = document.createElement('span');
-        slider.className = 'slider';
-        
-        label.appendChild(input);
-        label.appendChild(slider);
-        
-        const nameLabel = document.createElement('span');
-        nameLabel.textContent = projectName;
-        
-        toggleWrapper.appendChild(label);
-        toggleWrapper.appendChild(nameLabel);
-        
-        input.addEventListener('change', () => {
-            this.toggleRowVisibility(row, input.checked);
-            this.updatePositions();
-        });
-        
-        return toggleWrapper;
-    },
-
-    toggleRowVisibility(row, isVisible) {
-        if (isVisible) {
-            row.classList.remove('hidden');
-            row.style.height = '';
-            row.style.opacity = '1';
-        } else {
-            row.classList.add('hidden');
-            row.style.height = '0';
-            row.style.opacity = '0';
-        }
-    },
-
-    updatePositions() {
-        let currentOffset = 0;
-        this.timelineRows.forEach(row => {
-            if (!row.classList.contains('hidden')) {
-                currentOffset += row.offsetHeight + 16;
-            }
-        });
-    },
-
-    validateTaskPositions() {
-        document.querySelectorAll('.task').forEach(task => {
-            const left = task.style.left;
-            const width = task.style.width;
-            task.title = `Position: ${left} | Width: ${width}`;
-        });
-    },
-
-    setupTaskButtons() {
-        // Gestionnaire pour le bouton "Nouvelle Tâche"
-        const addTaskBtn = document.getElementById('addTaskBtn');
-        if (addTaskBtn) {
-            addTaskBtn.addEventListener('click', () => {
-                ModalManager.openNewTaskModal();
-            });
-        }
-
-        // Gestionnaire pour les tâches existantes
-        document.querySelectorAll('.task').forEach(task => {
-            task.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const taskData = {
-                    id: task.dataset.taskId,
-                    projectId: task.closest('.timeline-row').dataset.projectId,
-                    text: task.dataset.taskInfo,
-                    startDate: task.dataset.startDate,
-                    endDate: task.dataset.endDate,
-                    etp: task.dataset.etp
-                };
-                ModalManager.openEditTaskModal(taskData);
-            });
-        });
-    }
-};
-
-
-// Gestionnaire des modals
-const ModalManager = {
-    init() {
-        this.initElements();
-        this.setupEventListeners();
-        this.setupProjectHandlers();
-        this.setupTaskHandlers();
-        this.initializeDateInputs();
-    },
-
-    initElements() {
-        this.elements = {
-            newProjectModal: document.getElementById('newProjectModal'),
-            newTaskModal: document.getElementById('newTaskModal'),
-            editTaskModal: document.getElementById('editTaskModal'),
-            projectForm: document.getElementById('projectForm'),
-            taskForm: document.getElementById('newTaskForm'),
-            editTaskForm: document.getElementById('editTaskForm'),
-            deleteTaskBtn: document.getElementById('deleteTaskBtn'),
-            deleteProjectBtn: document.getElementById('deleteProjectBtn'),
-            projectModalTitle: document.getElementById('projectModalTitle'),
-            submitProjectBtn: document.getElementById('submitProjectBtn'),
-            taskProjectSelect: document.getElementById('taskProject'),
-            editTaskProjectSelect: document.getElementById('editTaskProject'),
-            deleteTaskBtn: document.getElementById('deleteTaskBtn')
-        };
-    },
-
-    setupEventListeners() {
-        // Gestionnaires de fermeture des modals
-        document.querySelectorAll('.close, .close-modal').forEach(element => {
-            element.addEventListener('click', () => this.closeAllModals());
-        });
-
-        // Gestionnaire du formulaire de projet
-        if (this.elements.projectForm) {
-            this.elements.projectForm.addEventListener('submit', (e) => this.handleProjectSubmit(e));
-        }
-
-        // Gestion des formulaires de tâches
-        if (this.elements.taskForm) {
-            this.elements.taskForm.addEventListener('submit', (e) => this.handleTaskSubmit(e));
-        }
-
-        if (this.elements.editTaskForm) {
-            this.elements.editTaskForm.addEventListener('submit', (e) => this.handleEditTaskSubmit(e));
-        }
-
-        if (this.elements.deleteTaskBtn) {
-            this.elements.deleteTaskBtn.addEventListener('click', () => this.handleTaskDelete());
-        }
-
-        // Gestionnaire du bouton de suppression de projet
-        if (this.elements.deleteProjectBtn) {
-            this.elements.deleteProjectBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.handleProjectDelete();
-            });
-        }
-    },
-
-    
-    openNewProjectModal() {
-        const modal = this.elements.newProjectModal;
-        if (!modal) return;
-
-        // Reset du formulaire
-        this.elements.projectForm.reset();
-        document.getElementById('projectId').value = '';
-        
-        // Mise à jour du titre et des boutons
-        this.elements.projectModalTitle.textContent = 'Nouveau Projet';
-        this.elements.submitProjectBtn.textContent = 'Créer';
-        this.elements.deleteProjectBtn.style.display = 'none';
-
-        modal.classList.add('show');
-    },
-
-    openProjectEditModal(projectId, projectName, colorScheme) {
-        const modal = this.elements.newProjectModal;
-        if (!modal) return;
-
-        // Mise à jour du titre
-        this.elements.projectModalTitle.textContent = 'Modifier le Projet';
-
-        // Remplissage du formulaire
-        document.getElementById('projectId').value = projectId;
-        document.getElementById('projectName').value = projectName;
-        document.getElementById('colorScheme').value = colorScheme;
-
-        // Affichage du bouton de suppression et mise à jour du bouton de soumission
-        this.elements.deleteProjectBtn.style.display = 'block';
-        this.elements.submitProjectBtn.textContent = 'Modifier';
-
-        modal.classList.add('show');
-    },
-
-    async handleProjectSubmit(e) {
-        e.preventDefault();
-        const formData = new FormData(this.elements.projectForm);
-        const projectId = document.getElementById('projectId').value;
-        const method = projectId ? 'PUT' : 'POST';
-        const url = projectId ? `/project/api/projects/${projectId}` : '/project/api/projects';
-
-        try {
-            const response = await fetch(url, {
-                method: method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(Object.fromEntries(formData))
-            });
-
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || 'Erreur lors de l\'opération sur le projet');
-            }
-
-            window.location.reload();
-        } catch (error) {
-            console.error('Error:', error);
-            alert(error.message);
-        }
-    },
-
-    async handleProjectDelete() {
-        const projectId = document.getElementById('projectId').value;
-        const projectName = document.getElementById('projectName').value;
-
-        if (confirm(`Êtes-vous sûr de vouloir supprimer le projet "${projectName}" ?\nCette action supprimera également toutes les tâches associées.`)) {
-            try {
-                const response = await fetch(`/project/api/projects/${projectId}`, {
-                    method: 'DELETE'
-                });
-
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.error || 'Erreur lors de la suppression du projet');
-                }
-
-                window.location.reload();
-            } catch (error) {
-                console.error('Error:', error);
-                alert(error.message);
-            }
-        }
-    },
-
-    initializeDateInputs() {
-        const dateInputs = document.querySelectorAll('input[type="date"]');
-        const today = new Date().toISOString().split('T')[0];
-        
-        dateInputs.forEach(input => {
-            input.min = today;
-            
-            // Pour les inputs de date de fin, mettre à jour le min quand la date de début change
-            if (input.id.includes('End')) {
-                const startInput = document.getElementById(input.id.replace('End', 'Start'));
-                if (startInput) {
-                    startInput.addEventListener('change', () => {
-                        input.min = startInput.value;
-                        if (input.value && input.value < startInput.value) {
-                            input.value = startInput.value;
-                        }
-                    });
-                }
-            }
-        });
-    },
-
-    openNewTaskModal() {
-        const modal = this.elements.newTaskModal;
-        if (!modal) return;
-
-        this.elements.taskForm.reset();
-        this.updateProjectSelect();
-        modal.classList.add('show');
-    },
-
-    openEditTaskModal(taskData) {
-        const modal = this.elements.editTaskModal;
-        if (!modal) return;
-
-        // Remplir le formulaire avec les données de la tâche
-        document.getElementById('editTaskId').value = taskData.id;
-        document.getElementById('editTaskProject').value = taskData.projectId;
-        document.getElementById('editTaskText').value = taskData.text;
-        document.getElementById('editTaskStartDate').value = taskData.startDate;
-        document.getElementById('editTaskEndDate').value = taskData.endDate;
-        document.getElementById('editTaskEtp').value = taskData.etp;
-
-        modal.classList.add('show');
-    },
-
-    async handleTaskSubmit(e) {
-        e.preventDefault();
-        const formData = new FormData(this.elements.taskForm);
-        
-        try {
-            const response = await fetch('/project/api/tasks', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(Object.fromEntries(formData))
-            });
-
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || 'Erreur lors de la création de la tâche');
-            }
-
-            window.location.reload();
-        } catch (error) {
-            console.error('Error:', error);
-            alert(error.message);
-        }
-    },
-
-    async handleEditTaskSubmit(e) {
-        e.preventDefault();
-        const formData = new FormData(this.elements.editTaskForm);
-        const taskId = formData.get('task_id');
-        
-        try {
-            const response = await fetch(`/project/api/tasks/${taskId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(Object.fromEntries(formData))
-            });
-
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || 'Erreur lors de la modification de la tâche');
-            }
-
-            window.location.reload();
-        } catch (error) {
-            console.error('Error:', error);
-            alert(error.message);
-        }
-    },
-
-    async handleTaskDelete() {
-        const taskId = document.getElementById('editTaskId').value;
-        const taskText = document.getElementById('editTaskText').value;
-        
-        if (confirm(`Êtes-vous sûr de vouloir supprimer la tâche "${taskText}" ?`)) {
-            try {
-                const response = await fetch(`/project/api/tasks/${taskId}`, {
-                    method: 'DELETE'
-                });
-
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.error || 'Erreur lors de la suppression de la tâche');
-                }
-
-                window.location.reload();
-            } catch (error) {
-                console.error('Error:', error);
-                alert(error.message);
-            }
-        }
-    },
-
-    async updateProjectSelect() {
-        try {
-            const response = await fetch('/project/api/projects');
-            if (!response.ok) throw new Error('Erreur lors de la récupération des projets');
-            
-            const data = await response.json();
-            
-            [this.elements.taskProjectSelect, this.elements.editTaskProjectSelect].forEach(select => {
-                if (select) {
-                    select.innerHTML = '';
-                    data.data.projects.forEach(project => {
-                        const option = document.createElement('option');
-                        option.value = project.id;
-                        option.textContent = project.name;
-                        select.appendChild(option);
-                    });
-                }
-            });
-        } catch (error) {
-            console.error('Error updating project selects:', error);
-            alert('Erreur lors de la mise à jour de la liste des projets');
-        }
-    },
-
-    closeAllModals() {
-        document.querySelectorAll('.modal').forEach(modal => {
-            modal.classList.remove('show');
-        });
-    },
-
-    // ... Le reste du code pour la gestion des tâches reste inchangé
-};
-
-// Initialisation
-document.addEventListener('DOMContentLoaded', function() {
-    TimelineManager.init();
-    ModalManager.init();
-});
 ```
 
 ### project_service.py
@@ -759,7 +415,8 @@ class ProjectService:
         start_date: date,
         end_date: date,
         color: str,
-        etp: float = 1.0
+        etp: float = 1.0,
+        comment: str = None
     ) -> Optional[Task]:
         try:
             # Récupérer le projet pour obtenir son schéma de couleur
@@ -778,6 +435,7 @@ class ProjectService:
             task = Task(
                 project_id=project_id,
                 text=text,
+                comment=comment,
                 start_date=start_date,
                 end_date=end_date,
                 color=color,
@@ -1025,156 +683,6 @@ def init_db_data():
         raise
 ```
 
-### etp_table.js
-```js
-// static/js/project/etp_table.js
-
-document.addEventListener('DOMContentLoaded', function() {
-    const table = document.querySelector('.etp-table');
-    let activeInput = null;
-
-    // Gérer le clic sur une cellule éditable
-    document.addEventListener('click', function(e) {
-        const cell = e.target.closest('.editable-cell');
-        if (!cell) return;
-        if (cell.querySelector('input')) return;
-
-        const valueSpan = cell.querySelector('.etp-value');
-        const currentValue = valueSpan.textContent.trim();
-
-        const input = document.createElement('input');
-        input.type = 'number';
-        input.step = '0.1';
-        input.min = '0';
-        input.value = currentValue;
-        input.className = 'etp-input';
-
-        valueSpan.style.display = 'none';
-        cell.appendChild(input);
-        input.focus();
-        activeInput = input;
-
-        input.select();
-    });
-
-    // Gérer la validation des modifications
-    async function saveChange(cell, newValue) {
-        const project = cell.closest('tr').dataset.project;
-        const period = cell.dataset.period;
-
-        try {
-            const response = await fetch('/project/api/update_etp', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    project,
-                    period,
-                    etp: newValue
-                })
-            });
-
-            if (!response.ok) throw new Error('Failed to update ETP');
-
-            const valueSpan = cell.querySelector('.etp-value');
-            valueSpan.textContent = parseFloat(newValue).toFixed(2);
-            valueSpan.style.display = '';
-            valueSpan.classList.add('updated');
-            
-            if (cell.querySelector('input')) {
-                cell.querySelector('input').remove();
-            }
-
-            updateTotals();
-            
-        } catch (error) {
-            console.error('Error updating ETP:', error);
-            alert('Failed to update ETP');
-        }
-    }
-
-    // Gérer les touches clavier pendant l'édition
-    document.addEventListener('keydown', function(e) {
-        if (!activeInput) return;
-        
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            const newValue = activeInput.value;
-            if (newValue && !isNaN(newValue)) {
-                const cell = activeInput.closest('.editable-cell');
-                saveChange(cell, newValue);
-            }
-            activeInput = null;
-        } else if (e.key === 'Escape') {
-            const cell = activeInput.closest('.editable-cell');
-            cell.querySelector('.etp-value').style.display = '';
-            activeInput.remove();
-            activeInput = null;
-        }
-    });
-
-    // Gérer la perte de focus
-    document.addEventListener('click', function(e) {
-        if (activeInput && !activeInput.contains(e.target) && !e.target.closest('.editable-cell')) {
-            const newValue = activeInput.value;
-            if (newValue && !isNaN(newValue)) {
-                const cell = activeInput.closest('.editable-cell');
-                saveChange(cell, newValue);
-            }
-            activeInput = null;
-        }
-    });
-
-    // Fonction pour mettre à jour tous les totaux
-    function updateTotals() {
-        // Totaux par période
-        const periods = ['2025 Q1-Q2', '2025 Q3-Q4', '2026-2027'];
-        
-        periods.forEach(period => {
-            const cells = table.querySelectorAll(`td[data-period="${period}"] .etp-value`);
-            const total = Array.from(cells)
-                .reduce((sum, cell) => sum + parseFloat(cell.textContent || 0), 0);
-            const totalCell = table.querySelector(`.period-total[data-period="${period}"]`);
-            if (totalCell) {
-                totalCell.textContent = total.toFixed(2);
-                totalCell.classList.add('updated');
-            }
-        });
-
-        // Totaux par ligne (max ETP)
-        const projectRows = table.querySelectorAll('tr[data-project]');
-        projectRows.forEach(row => {
-            const etpCells = row.querySelectorAll('.etp-value');
-            const maxEtp = Array.from(etpCells)
-                .reduce((max, cell) => Math.max(max, parseFloat(cell.textContent || 0)), 0);
-            const totalCell = row.querySelector('.row-total');
-            if (totalCell) {
-                totalCell.textContent = maxEtp.toFixed(2);
-                totalCell.classList.add('updated');
-            }
-        });
-
-        // Total général (somme des max ETP)
-        const rowTotals = Array.from(table.querySelectorAll('.row-total'))
-            .map(cell => parseFloat(cell.textContent || 0));
-        const grandTotal = rowTotals.reduce((sum, val) => sum + val, 0);
-        const grandTotalCell = table.querySelector('.grand-total');
-        if (grandTotalCell) {
-            grandTotalCell.textContent = grandTotal.toFixed(2);
-            grandTotalCell.classList.add('updated');
-        }
-
-        // Retirer les classes 'updated' après l'animation
-        setTimeout(() => {
-            table.querySelectorAll('.updated').forEach(el => {
-                el.classList.remove('updated');
-            });
-        }, 1000);
-    }
-});
-```
-
 ### etp_service.py
 ```py
 from collections import defaultdict
@@ -1281,254 +789,433 @@ class EtpService:
         db.session.commit()
 ```
 
-### timeline.html
-```html
-{% extends "base.html" %}
+### __init__.py
+```py
+from .main import bp as main
+from .project import bp as project
 
-{% block title %}Timeline - Project Manager{% endblock %}
-
-{% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/timeline.css') }}">
-{% endblock %}
-
-{% block content %}
-    <div class="timeline-container">
-        <h1 class="page-title">Project Timeline</h1>
-        
-        <!-- Boutons d'action -->
-        <div class="action-buttons">
-            <button id="addProjectBtn" class="btn-primary">
-                <i class="fas fa-plus"></i> Nouveau Projet
-            </button>
-            <button id="addTaskBtn" class="btn-primary">
-                <i class="fas fa-plus"></i> Nouvelle Tâche
-            </button>
-        </div>
-        
-        <div class="timeline-grid">
-            <div class="timeline-main">
-                <div class="periods-grid">
-                    <div class="period"></div>
-                    {% for period in periods %}
-                    <div class="period">{{ period }}</div>
-                    {% endfor %}
-                </div>
-
-                <div class="timeline-rows-container">
-                    {% for project in projects %}
-                    <div class="timeline-row" 
-                         data-project-name="{{ project.name }}" 
-                         data-project-id="{{ project.id }}"
-                         data-color-scheme="{{ project.color_scheme }}">
-                        <div class="project-name">{{ project.name }}</div>
-                        <div class="project-tasks">
-                            {% for task in project.tasks %}
-                            <div class="task bg-{{ task.color }}"
-                                style="left: {{ task.start }}%; width: {{ task.width }}%;"
-                                data-task-id="{{ task.id }}"
-                                data-task-info="{{ task.text }}"
-                                data-dates="{{ task.dates }}"
-                                data-start-date="{{ task.raw_start_date }}"
-                                data-end-date="{{ task.raw_end_date }}"
-                                data-etp="{{ task.etp }}">
-                                {{ task.text }}
-                            </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="newProjectModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="projectModalTitle">Nouveau Projet</h2>
-                <span class="close">&times;</span>
-            </div>
-            <form id="projectForm">
-                <input type="hidden" id="projectId" name="project_id" value="">
-                
-                <div class="form-group">
-                    <label for="projectName">Nom du projet</label>
-                    <input type="text" id="projectName" name="name" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="colorScheme">Schéma de couleur</label>
-                    <select id="colorScheme" name="colorScheme" required>
-                        <option value="blue">Bleu</option>
-                        <option value="purple">Violet</option>
-                        <option value="green">Vert</option>
-                        <option value="yellow">Jaune</option>
-                        <option value="red">Rouge</option>
-                        <option value="indigo">Indigo</option>
-                        <option value="teal">Teal</option>
-                        <option value="gray">Gris</option>
-                    </select>
-                </div>
-                
-                <div class="modal-footer">
-                    <button type="button" id="deleteProjectBtn" class="btn-danger" style="display: none;">
-                        Supprimer le projet
-                    </button>
-                    <div class="action-buttons">
-                        <button type="submit" id="submitProjectBtn" class="btn-primary">Créer</button>
-                        <button type="button" class="btn-secondary close-modal">Annuler</button>
-                    </div>
-                </div>
-            </form>
-        </div>
-    </div>
-    
-    <!-- Modal Nouvelle Tâche -->
-    <div id="newTaskModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Nouvelle Tâche</h2>
-                <span class="close">&times;</span>
-            </div>
-            <form id="newTaskForm">
-                <div class="form-group">
-                    <label for="taskProject">Projet</label>
-                    <select id="taskProject" name="project_id" required>
-                        <!-- Rempli dynamiquement -->
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="taskText">Description</label>
-                    <input type="text" id="taskText" name="text" required>
-                </div>
-                <div class="form-group">
-                    <label for="taskStartDate">Date de début</label>
-                    <input type="date" id="taskStartDate" name="start_date" required>
-                </div>
-                <div class="form-group">
-                    <label for="taskEndDate">Date de fin</label>
-                    <input type="date" id="taskEndDate" name="end_date" required>
-                </div>
-                <div class="form-group">
-                    <label for="taskEtp">ETP</label>
-                    <input type="number" id="taskEtp" name="etp" step="0.1" min="0" value="1.0" required>
-                </div>
-                <div class="modal-footer">
-                    <button type="submit" class="btn-primary">Créer</button>
-                    <button type="button" class="btn-secondary close-modal">Annuler</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div id="editTaskModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Modifier la Tâche</h2>
-                <span class="close">&times;</span>
-            </div>
-            <form id="editTaskForm">
-                <input type="hidden" id="editTaskId" name="task_id">
-                <div class="form-group">
-                    <label for="editTaskProject">Projet</label>
-                    <select id="editTaskProject" name="project_id" required disabled>
-                        <!-- Rempli dynamiquement -->
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="editTaskText">Description</label>
-                    <input type="text" id="editTaskText" name="text" required>
-                </div>
-                <div class="form-group">
-                    <label for="editTaskStartDate">Date de début</label>
-                    <input type="date" id="editTaskStartDate" name="start_date" required>
-                </div>
-                <div class="form-group">
-                    <label for="editTaskEndDate">Date de fin</label>
-                    <input type="date" id="editTaskEndDate" name="end_date" required>
-                </div>
-                <div class="form-group">
-                    <label for="editTaskEtp">ETP</label>
-                    <input type="number" id="editTaskEtp" name="etp" step="0.1" min="0" required>
-                </div>
-                <div class="modal-footer">
-                    <button type="submit" class="btn-primary">Enregistrer</button>
-                    <button type="button" class="btn-danger" id="deleteTaskBtn">Supprimer</button>
-                    <button type="button" class="btn-secondary close-modal">Annuler</button>
-                </div>
-            </form>
-        </div>
-    </div>
-{% endblock %}
-
-{% block extra_js %}
-<script src="{{ url_for('static', filename='js/project/timeline.js') }}"></script>
-{% endblock %}
+__all__ = ['main', 'project']
 ```
 
-### etp_table.html
-```html
-{% extends "base.html" %}
+### base.js
+```js
+// base.js - Fonctionnalités communes à toute l'application
 
-{% block title %}ETP Table - Project Manager{% endblock %}
+document.addEventListener('DOMContentLoaded', function() {
+    // Configuration des variables globales
+    window.APP = {
+        config: {
+            animationDuration: 300,
+            dateFormat: 'DD/MM/YYYY',
+            apiEndpoint: '/api'
+        }
+    };
 
-{% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/project/etp_table.css') }}">
-{% endblock %}
+    // Gestion de la navigation active
+    const handleActiveNavigation = () => {
+        const currentPath = window.location.pathname;
+        document.querySelectorAll('.nav-links a').forEach(link => {
+            if (link.getAttribute('href') === currentPath) {
+                link.classList.add('active');
+            }
+        });
+    };
 
-{% block content %}
-<div class="etp-container">
-    <h1 class="page-title">Resource Allocation (ETP)</h1>
+    // Gestion des notifications
+    const notifications = {
+        container: null,
+        
+        init() {
+            this.container = document.createElement('div');
+            this.container.className = 'notifications-container';
+            document.body.appendChild(this.container);
+        },
+
+        show(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification notification-${type}`;
+            notification.textContent = message;
+            
+            this.container.appendChild(notification);
+            
+            // Animation d'entrée
+            setTimeout(() => {
+                notification.classList.add('show');
+            }, 10);
+
+            // Auto-suppression après 5 secondes
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => {
+                    notification.remove();
+                }, 300);
+            }, 5000);
+        }
+    };
+
+    // Gestion du thème
+    const themeManager = {
+        init() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            this.setTheme(savedTheme);
+            
+            // Écouteur pour le bouton de changement de thème (si présent)
+            const themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', () => {
+                    const newTheme = document.body.classList.contains('dark-theme') ? 'light' : 'dark';
+                    this.setTheme(newTheme);
+                });
+            }
+        },
+
+        setTheme(theme) {
+            document.body.classList.remove('light-theme', 'dark-theme');
+            document.body.classList.add(`${theme}-theme`);
+            localStorage.setItem('theme', theme);
+        }
+    };
+
+    // Utilitaires pour les dates
+    const dateUtils = {
+        formatDate(date) {
+            return new Intl.DateTimeFormat('fr-FR').format(date);
+        },
+
+        formatDateTime(date) {
+            return new Intl.DateTimeFormat('fr-FR', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            }).format(date);
+        }
+    };
+
+    // Gestion des formulaires
+    const formManager = {
+        init() {
+            document.querySelectorAll('form').forEach(form => {
+                form.addEventListener('submit', this.handleSubmit.bind(this));
+            });
+        },
+
+        handleSubmit(event) {
+            const form = event.target;
+            
+            // Désactiver le bouton submit pendant le traitement
+            const submitButton = form.querySelector('[type="submit"]');
+            if (submitButton) {
+                submitButton.disabled = true;
+            }
+
+            // Réactiver le bouton après le traitement
+            setTimeout(() => {
+                if (submitButton) {
+                    submitButton.disabled = false;
+                }
+            }, 1000);
+        },
+
+        validateForm(form) {
+            let isValid = true;
+            const inputs = form.querySelectorAll('input[required], select[required], textarea[required]');
+            
+            inputs.forEach(input => {
+                if (!input.value.trim()) {
+                    isValid = false;
+                    this.showError(input, 'Ce champ est requis');
+                } else {
+                    this.clearError(input);
+                }
+            });
+
+            return isValid;
+        },
+
+        showError(input, message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'form-error';
+            errorDiv.textContent = message;
+            input.classList.add('error');
+            input.parentNode.appendChild(errorDiv);
+        },
+
+        clearError(input) {
+            input.classList.remove('error');
+            const errorDiv = input.parentNode.querySelector('.form-error');
+            if (errorDiv) {
+                errorDiv.remove();
+            }
+        }
+    };
+
+    // Gestion des erreurs globales
+    //window.onerror = function(msg, url, lineNo, columnNo, error) {
+        //console.error('Error: ', msg, url, lineNo, columnNo, error);
+        //notifications.show('Une erreur est survenue', 'error');
+        //return false;
+    //};
+
+    // Initialisation des composants
+    const init = () => {
+        handleActiveNavigation();
+        notifications.init();
+        themeManager.init();
+        formManager.init();
+        
+        // Exposer les utilitaires globalement
+        window.APP = {
+            ...window.APP,
+            notifications,
+            dateUtils,
+            formManager
+        };
+    };
+
+    // Lancer l'initialisation
+    init();
+});
+```
+
+### project.py
+```py
+from flask import Blueprint, render_template, jsonify, request, redirect, url_for
+from app.services import ProjectService, EtpService
+from app.models import Project, Task
+from app.constants import TimeConstants
+from datetime import datetime
+from app import db
+
+bp = Blueprint('project', __name__, url_prefix='/project')
+
+# Utilitaires communs
+def make_response(data=None, error=None, status=200):
+    """Utilitaire pour standardiser les réponses API"""
+    if error:
+        return jsonify({'error': str(error)}), status
+    return jsonify({'status': 'success', 'data': data}), status
+
+# Routes de pages (Views)
+@bp.route('/timeline')
+def timeline():
+    """Page de la timeline des projets"""
+    projects = ProjectService.get_all_projects()
+    return render_template('project/timeline.html',
+                         projects=[p.to_dict() for p in projects],
+                         periods=TimeConstants.PERIODS_DISPLAY,
+                         milestones=TimeConstants.MILESTONES)
+
+@bp.route('/etp')
+def etp_redirect():
+    """Redirection vers la table ETP"""
+    return redirect(url_for('project.etp_table'))
+
+@bp.route('/etp_table')
+def etp_table():
+    """Page de la table ETP"""
+    projects = ProjectService.get_all_projects()
+    etp_data, period_totals = EtpService.calculate_etp_per_period(projects)
+    total_max_etp = sum(row["total"] for row in etp_data)
+    return render_template('project/etp_table.html',
+                         etp_data=etp_data,
+                         period_totals=period_totals,
+                         total_max_etp=total_max_etp)
+
+# API Routes - Projects
+@bp.route('/api/projects', methods=['GET'])
+def get_projects():
+    """Liste tous les projets"""
+    try:
+        projects = ProjectService.get_all_projects()
+        return make_response(data={'projects': [{'id': p.id, 'name': p.name} for p in projects]})
+    except Exception as e:
+        return make_response(error=e, status=500)
+
+@bp.route('/api/projects', methods=['POST'])
+def create_project():
+    """Crée un nouveau projet"""
+    try:
+        data = request.json
+        name = data.get('name')
+        if not name:
+            return make_response(error='Le nom du projet est requis', status=400)
+            
+        color_scheme = data.get('colorScheme', 'blue')
+        project = ProjectService.create_project(name, color_scheme)
+        
+        return make_response(
+            data={'project': {'id': project.id, 'name': project.name}},
+            status=201
+        )
+    except ValueError as e:
+        return make_response(error=e, status=400)
+    except Exception as e:
+        return make_response(error='Erreur lors de la création du projet', status=500)
+
+@bp.route('/api/projects/<int:project_id>', methods=['PUT'])
+def update_project(project_id):
+    """Met à jour un projet existant"""
+    try:
+        data = request.json
+        project = Project.query.get(project_id)
+        
+        if not project:
+            return make_response(error='Projet non trouvé', status=404)
+            
+        # Mise à jour uniquement des champs fournis
+        if 'name' in data:
+            project.name = data['name']
+        if 'colorScheme' in data:
+            project.color_scheme = data['colorScheme']
+            
+            # Mise à jour des couleurs des tâches
+            for task in project.tasks:
+                # Extraire l'intensité de la couleur actuelle
+                intensity = task.color.split('-')[1]
+                # Appliquer la nouvelle couleur avec la même intensité
+                task.color = f"{data['colorScheme']}-{intensity}"
+        
+        db.session.commit()
+        
+        return make_response(data={
+            'project': project.to_dict()
+        })
+    except Exception as e:
+        db.session.rollback()
+        return make_response(error=str(e), status=500)
+
+@bp.route('/api/projects/<int:project_id>', methods=['DELETE'])
+def delete_project(project_id):
+    """Supprime un projet et ses tâches associées"""
+    try:
+        success = ProjectService.delete_project(project_id)
+        if not success:
+            return make_response(error='Projet non trouvé', status=404)
+        return make_response()
+    except Exception as e:
+        db.session.rollback()
+        return make_response(error=e, status=500)
+
+# API Routes - Tasks
+@bp.route('/api/tasks', methods=['POST'])
+def create_task():
+    """Crée une nouvelle tâche"""
+    try:
+        data = request.json
+        required_fields = ['project_id', 'text', 'start_date', 'end_date']
+        
+        if not all(field in data for field in required_fields):
+            return make_response(error='Tous les champs requis doivent être renseignés', status=400)
+        
+        # Traitement des dates et création de la tâche
+        task = ProjectService.create_task(
+            project_id=int(data['project_id']),
+            text=data['text'],
+            comment=data.get('comment'),
+            start_date=datetime.strptime(data['start_date'], '%Y-%m-%d').date(),
+            end_date=datetime.strptime(data['end_date'], '%Y-%m-%d').date(),
+            color=None,  # La couleur sera déterminée par le service
+            etp=float(data.get('etp', 1.0))
+        )
+        
+        if not task:
+            return make_response(error="La tâche n'a pas été créée correctement", status=500)
+            
+        return make_response(data={'task': task.to_dict()}, status=201)
+        
+    except Exception as e:
+        return make_response(error=e, status=500)
+
+@bp.route('/api/tasks/<int:task_id>', methods=['PUT'])
+def update_task(task_id):
+    """Met à jour une tâche existante"""
+    try:
+        data = request.json
+        task = Task.query.get(task_id)
+        
+        if not task:
+            return make_response(error='Tâche non trouvée', status=404)
+            
+        # Mise à jour des champs
+        task.text = data.get('text', task.text)
+        task.comment = data.get('comment', task.comment) 
+        task.start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date()
+        task.end_date = datetime.strptime(data['end_date'], '%Y-%m-%d').date()
+        task.etp = float(data.get('etp', task.etp))
+        
+        db.session.commit()
+        
+        return make_response(data={'task': task.to_dict()})
+        
+    except Exception as e:
+        db.session.rollback()
+        return make_response(error=e, status=500)
+
+@bp.route('/api/tasks/<int:task_id>', methods=['DELETE'])
+def delete_task(task_id):
+    """Supprime une tâche"""
+    try:
+        success = ProjectService.delete_task(task_id)
+        if not success:
+            return make_response(error='Tâche non trouvée', status=404)
+        return make_response()
+    except Exception as e:
+        return make_response(error=e, status=500)
+```
+
+### main.py
+```py
+from flask import Blueprint, render_template
+
+bp = Blueprint('main', __name__)
+
+@bp.route('/')
+def index():
+    return render_template('base.html')
+```
+
+### constants.py
+```py
+class TimeConstants:
+    PERIODS_MAPPING = {
+        1: "2025 Q1-Q2",
+        2: "2025 Q3-Q4",
+        3: "2026-2027"
+    }
     
-    <div class="etp-table-container">
-        <table class="etp-table">
-            <thead>
-                <tr>
-                    <th>Stream</th>
-                    <th>2025 Q1-Q2</th>
-                    <th>2025 Q3-Q4</th>
-                    <th>2026-2027</th>
-                    <th>ETP Total</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for row in etp_data %}
-                <tr data-project="{{ row.name }}">
-                    <td>{{ row.name }}</td>
-                    <td class="text-center editable-cell" data-period="2025 Q1-Q2">
-                        <span class="etp-value">{{ "%.2f"|format(row["2025 Q1-Q2"]) }}</span>
-                    </td>
-                    <td class="text-center editable-cell" data-period="2025 Q3-Q4">
-                        <span class="etp-value">{{ "%.2f"|format(row["2025 Q3-Q4"]) }}</span>
-                    </td>
-                    <td class="text-center editable-cell" data-period="2026-2027">
-                        <span class="etp-value">{{ "%.2f"|format(row["2026-2027"]) }}</span>
-                    </td>
-                    <td class="text-center row-total">{{ "%.2f"|format(row.total) }}</td>
-                </tr>
-                {% endfor %}
-                <tr class="total-row">
-                    <td class="bold">Total ETP by period</td>
-                    <td class="text-center period-total" data-period="2025 Q1-Q2">
-                        {{ "%.2f"|format(period_totals["2025 Q1-Q2"]) }}
-                    </td>
-                    <td class="text-center period-total" data-period="2025 Q3-Q4">
-                        {{ "%.2f"|format(period_totals["2025 Q3-Q4"]) }}
-                    </td>
-                    <td class="text-center period-total" data-period="2026-2027">
-                        {{ "%.2f"|format(period_totals["2026-2027"]) }}
-                    </td>
-                    <td class="text-center grand-total">{{ "%.2f"|format(total_max_etp) }}</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-</div>
-{% endblock %}
+    PERIODS_DISPLAY = [
+        "2025 Q1",
+        "2025 Q2",
+        "2025 Q3",
+        "2025 Q4",
+        "2026-2027"
+    ]
+    
+    MILESTONES = [
+        {"position": "left-1/3", "text": "RFI"},
+        {"position": "left-1/2", "text": "RFP"},
+        {"position": "left-2/3", "text": "Pilot"},
+        {"position": "right-1/6", "text": "Déploiement"}
+    ]
+```
 
-{% block extra_js %}
-<script src="{{ url_for('static', filename='js/project/etp_table.js') }}"></script>
-{% endblock %}
+### config.py
+```py
+from datetime import timedelta
+
+class Config:
+    SECRET_KEY = 'your-secret-key-here'
+    DEBUG = False
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///project_manager.db'
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+class DevelopmentConfig(Config):
+    DEBUG = True
+
+class ProductionConfig(Config):
+    DEBUG = False
 ```
 
 ### timeline.css
@@ -2013,6 +1700,47 @@ input:checked + .slider:before {
     background-color: var(--primary-color);
     color: white;
 }
+
+
+
+
+.task-tooltip {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    white-space: pre-wrap;
+    max-width: 300px;
+    z-index: 1000;
+    pointer-events: none;
+}
+
+.task-tooltip .dates {
+    color: #93c5fd;
+    margin-bottom: 0.25rem;
+}
+
+.task-tooltip .comment {
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    padding-top: 0.25rem;
+    margin-top: 0.25rem;
+    font-style: italic;
+    color: #cbd5e1;
+}
+
+.form-group textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+    resize: vertical;
+}
 ```
 
 ### normalize.css
@@ -2253,317 +1981,6 @@ body {
 
 ```
 
-### config.py
-```py
-from datetime import timedelta
-
-class Config:
-    SECRET_KEY = 'your-secret-key-here'
-    DEBUG = False
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///project_manager.db'
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
-
-class DevelopmentConfig(Config):
-    DEBUG = True
-
-class ProductionConfig(Config):
-    DEBUG = False
-```
-
-### run.py
-```py
-from app import create_app, db
-from app.services.init_data import init_db_data
-import logging
-import os
-
-# Configuration du logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-app = create_app()
-
-# Nom du fichier de la base de données
-DB_FILE = 'instance/project_manager.db'
-
-if __name__ == '__main__':
-    with app.app_context():
-        try:
-            # Vérifie si la base de données existe déjà
-            db_exists = os.path.exists(DB_FILE)
-            
-            if not db_exists:
-                logger.info("Base de données non trouvée, création initiale...")
-                db.create_all()
-                logger.info("Tables créées avec succès")
-                
-                logger.info("Initialisation avec les données de test...")
-                init_db_data()
-                logger.info("Données de test initialisées avec succès")
-            else:
-                logger.info("Base de données existante trouvée, conservation des données...")
-        
-        except Exception as e:
-            logger.error(f"Une erreur est survenue : {str(e)}")
-            raise e
-        
-    logger.info("Démarrage de l'application Flask...")
-    app.run(debug=True)
-```
-
-### __init__.py
-```py
-from .main import bp as main
-from .project import bp as project
-
-__all__ = ['main', 'project']
-```
-
-### project.py
-```py
-from flask import Blueprint, render_template, jsonify, request, redirect, url_for
-from app.services import ProjectService, EtpService
-from app.models import Project, Task
-from app.constants import TimeConstants
-from datetime import datetime
-from app import db
-
-bp = Blueprint('project', __name__, url_prefix='/project')
-
-# Utilitaires communs
-def make_response(data=None, error=None, status=200):
-    """Utilitaire pour standardiser les réponses API"""
-    if error:
-        return jsonify({'error': str(error)}), status
-    return jsonify({'status': 'success', 'data': data}), status
-
-# Routes de pages (Views)
-@bp.route('/timeline')
-def timeline():
-    """Page de la timeline des projets"""
-    projects = ProjectService.get_all_projects()
-    return render_template('project/timeline.html',
-                         projects=[p.to_dict() for p in projects],
-                         periods=TimeConstants.PERIODS_DISPLAY,
-                         milestones=TimeConstants.MILESTONES)
-
-@bp.route('/etp')
-def etp_redirect():
-    """Redirection vers la table ETP"""
-    return redirect(url_for('project.etp_table'))
-
-@bp.route('/etp_table')
-def etp_table():
-    """Page de la table ETP"""
-    projects = ProjectService.get_all_projects()
-    etp_data, period_totals = EtpService.calculate_etp_per_period(projects)
-    total_max_etp = sum(row["total"] for row in etp_data)
-    return render_template('project/etp_table.html',
-                         etp_data=etp_data,
-                         period_totals=period_totals,
-                         total_max_etp=total_max_etp)
-
-# API Routes - Projects
-@bp.route('/api/projects', methods=['GET'])
-def get_projects():
-    """Liste tous les projets"""
-    try:
-        projects = ProjectService.get_all_projects()
-        return make_response(data={'projects': [{'id': p.id, 'name': p.name} for p in projects]})
-    except Exception as e:
-        return make_response(error=e, status=500)
-
-@bp.route('/api/projects', methods=['POST'])
-def create_project():
-    """Crée un nouveau projet"""
-    try:
-        data = request.json
-        name = data.get('name')
-        if not name:
-            return make_response(error='Le nom du projet est requis', status=400)
-            
-        color_scheme = data.get('colorScheme', 'blue')
-        project = ProjectService.create_project(name, color_scheme)
-        
-        return make_response(
-            data={'project': {'id': project.id, 'name': project.name}},
-            status=201
-        )
-    except ValueError as e:
-        return make_response(error=e, status=400)
-    except Exception as e:
-        return make_response(error='Erreur lors de la création du projet', status=500)
-
-@bp.route('/api/projects/<int:project_id>', methods=['PUT'])
-def update_project(project_id):
-    """Met à jour un projet existant"""
-    try:
-        data = request.json
-        project = Project.query.get(project_id)
-        
-        if not project:
-            return make_response(error='Projet non trouvé', status=404)
-            
-        # Mise à jour uniquement des champs fournis
-        if 'name' in data:
-            project.name = data['name']
-        if 'colorScheme' in data:
-            project.color_scheme = data['colorScheme']
-        
-        db.session.commit()
-        
-        return make_response(data={
-            'project': project.to_dict()
-        })
-    except Exception as e:
-        db.session.rollback()
-        return make_response(error=str(e), status=500)
-
-@bp.route('/api/projects/<int:project_id>', methods=['DELETE'])
-def delete_project(project_id):
-    """Supprime un projet et ses tâches associées"""
-    try:
-        success = ProjectService.delete_project(project_id)
-        if not success:
-            return make_response(error='Projet non trouvé', status=404)
-        return make_response()
-    except Exception as e:
-        db.session.rollback()
-        return make_response(error=e, status=500)
-
-# API Routes - Tasks
-@bp.route('/api/tasks', methods=['POST'])
-def create_task():
-    """Crée une nouvelle tâche"""
-    try:
-        data = request.json
-        required_fields = ['project_id', 'text', 'start_date', 'end_date']
-        
-        if not all(field in data for field in required_fields):
-            return make_response(error='Tous les champs requis doivent être renseignés', status=400)
-        
-        # Traitement des dates et création de la tâche
-        task = ProjectService.create_task(
-            project_id=int(data['project_id']),
-            text=data['text'],
-            start_date=datetime.strptime(data['start_date'], '%Y-%m-%d').date(),
-            end_date=datetime.strptime(data['end_date'], '%Y-%m-%d').date(),
-            color=None,  # La couleur sera déterminée par le service
-            etp=float(data.get('etp', 1.0))
-        )
-        
-        if not task:
-            return make_response(error="La tâche n'a pas été créée correctement", status=500)
-            
-        return make_response(data={'task': task.to_dict()}, status=201)
-        
-    except Exception as e:
-        return make_response(error=e, status=500)
-
-@bp.route('/api/tasks/<int:task_id>', methods=['PUT'])
-def update_task(task_id):
-    """Met à jour une tâche existante"""
-    try:
-        data = request.json
-        task = Task.query.get(task_id)
-        
-        if not task:
-            return make_response(error='Tâche non trouvée', status=404)
-            
-        # Mise à jour des champs
-        task.text = data.get('text', task.text)
-        task.start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date()
-        task.end_date = datetime.strptime(data['end_date'], '%Y-%m-%d').date()
-        task.etp = float(data.get('etp', task.etp))
-        
-        db.session.commit()
-        
-        return make_response(data={'task': task.to_dict()})
-        
-    except Exception as e:
-        db.session.rollback()
-        return make_response(error=e, status=500)
-
-@bp.route('/api/tasks/<int:task_id>', methods=['DELETE'])
-def delete_task(task_id):
-    """Supprime une tâche"""
-    try:
-        success = ProjectService.delete_task(task_id)
-        if not success:
-            return make_response(error='Tâche non trouvée', status=404)
-        return make_response()
-    except Exception as e:
-        return make_response(error=e, status=500)
-```
-
-### main.py
-```py
-from flask import Blueprint, render_template
-
-bp = Blueprint('main', __name__)
-
-@bp.route('/')
-def index():
-    return render_template('base.html')
-```
-
-### etp_entry.py
-```py
-from app import db
-from datetime import datetime
-
-class EtpEntry(db.Model):
-    __tablename__ = 'etp_entries'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
-    period = db.Column(db.String(20), nullable=False)
-    etp_value = db.Column(db.Float, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    __table_args__ = (
-        db.UniqueConstraint('project_id', 'period', name='uix_project_period'),
-    )
-
-```
-
-### project.py
-```py
-from app import db
-from datetime import datetime
-
-class Project(db.Model):
-    __tablename__ = 'projects'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
-    color_scheme = db.Column(db.String(50), nullable=False, default='blue')
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Relations
-    tasks = db.relationship('Task', backref='project', lazy=True, cascade='all, delete-orphan')
-    etp_entries = db.relationship('EtpEntry', backref='project', lazy=True, cascade='all, delete-orphan')
-    
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'name': self.name,
-            'color_scheme': self.color_scheme,
-            'tasks': [task.to_dict() for task in self.tasks]
-        }
-```
-
-### __init__.py
-```py
-from .project import Project
-from .task import Task
-from .etp_entry import EtpEntry
-
-__all__ = ['Project', 'Task', 'EtpEntry']
-```
-
 ### env.py
 ```py
 import logging
@@ -2682,6 +2099,36 @@ else:
 
 ```
 
+### etp_entry.py
+```py
+from app import db
+from datetime import datetime
+
+class EtpEntry(db.Model):
+    __tablename__ = 'etp_entries'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
+    period = db.Column(db.String(20), nullable=False)
+    etp_value = db.Column(db.Float, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('project_id', 'period', name='uix_project_period'),
+    )
+
+```
+
+### __init__.py
+```py
+from .project import Project
+from .task import Task
+from .etp_entry import EtpEntry
+
+__all__ = ['Project', 'Task', 'EtpEntry']
+```
+
 ### task.py
 ```py
 from app import db
@@ -2693,6 +2140,7 @@ class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
     text = db.Column(db.String(200), nullable=False)
+    comment = db.Column(db.Text)
     start_date = db.Column(db.Date, nullable=False)
     end_date = db.Column(db.Date, nullable=False)
     color = db.Column(db.String(50), nullable=False)
@@ -2737,6 +2185,7 @@ class Task(db.Model):
             'id': self.id,
             'project_id': self.project_id,
             'text': self.text,
+            'comment': self.comment or '',
             'start_date': self.start_date.strftime('%d/%m/%Y'),  # Format de date pour l'affichage
             'end_date': self.end_date.strftime('%d/%m/%Y'),      # Format de date pour l'affichage
             'dates': f"{self.start_date.strftime('%d/%m/%Y')} - {self.end_date.strftime('%d/%m/%Y')}", # Pour l'infobulle
@@ -2748,5 +2197,658 @@ class Task(db.Model):
             'width': width
         }
 
+```
+
+### project.py
+```py
+from app import db
+from datetime import datetime
+
+class Project(db.Model):
+    __tablename__ = 'projects'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    color_scheme = db.Column(db.String(50), nullable=False, default='blue')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relations
+    tasks = db.relationship('Task', backref='project', lazy=True, cascade='all, delete-orphan')
+    etp_entries = db.relationship('EtpEntry', backref='project', lazy=True, cascade='all, delete-orphan')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'color_scheme': self.color_scheme,
+            'tasks': [task.to_dict() for task in self.tasks]
+        }
+```
+
+### timeline.js
+```js
+// Gestionnaire de la timeline
+const TimelineManager = {
+    init() {
+        this.timelineRows = document.querySelectorAll('.timeline-row');
+        this.setupStreamToggles();
+        this.validateTaskPositions();
+        this.setupProjectButtons();
+        this.setupTaskButtons();
+    },
+
+    setupStreamToggles() {
+        const streamToggles = document.createElement('div');
+        streamToggles.className = 'stream-toggles';
+        
+        this.timelineRows.forEach((row) => {
+            const toggleWrapper = this.createToggle(row);
+            streamToggles.appendChild(toggleWrapper);
+        });
+        
+        const timelineContainer = document.querySelector('.timeline-container');
+        timelineContainer.insertBefore(streamToggles, timelineContainer.querySelector('.timeline-grid'));
+    },
+
+    setupProjectButtons() {
+        // Gérer le bouton "Nouveau Projet"
+        const addProjectBtn = document.getElementById('addProjectBtn');
+        if (addProjectBtn) {
+            addProjectBtn.addEventListener('click', () => {
+                ModalManager.openNewProjectModal();
+            });
+        }
+
+        // Gérer les clics sur les noms de projets
+        document.querySelectorAll('.project-name').forEach(projectName => {
+            projectName.addEventListener('click', (e) => {
+                e.preventDefault();
+                const projectId = projectName.closest('.timeline-row').dataset.projectId;
+                const projectTitle = projectName.textContent.trim();
+                const colorScheme = projectName.closest('.timeline-row').dataset.colorScheme || 'blue';
+                ModalManager.openProjectEditModal(projectId, projectTitle, colorScheme);
+            });
+        });
+    },
+
+    createToggle(row) {
+        const projectName = row.dataset.projectName;
+        const toggleWrapper = document.createElement('div');
+        toggleWrapper.className = 'stream-toggle';
+        
+        const label = document.createElement('label');
+        label.className = 'switch';
+        
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.checked = true;
+        
+        const slider = document.createElement('span');
+        slider.className = 'slider';
+        
+        label.appendChild(input);
+        label.appendChild(slider);
+        
+        const nameLabel = document.createElement('span');
+        nameLabel.textContent = projectName;
+        
+        toggleWrapper.appendChild(label);
+        toggleWrapper.appendChild(nameLabel);
+        
+        input.addEventListener('change', () => {
+            this.toggleRowVisibility(row, input.checked);
+            this.updatePositions();
+        });
+        
+        return toggleWrapper;
+    },
+
+    toggleRowVisibility(row, isVisible) {
+        if (isVisible) {
+            row.classList.remove('hidden');
+            row.style.height = '';
+            row.style.opacity = '1';
+        } else {
+            row.classList.add('hidden');
+            row.style.height = '0';
+            row.style.opacity = '0';
+        }
+    },
+
+    updatePositions() {
+        let currentOffset = 0;
+        this.timelineRows.forEach(row => {
+            if (!row.classList.contains('hidden')) {
+                currentOffset += row.offsetHeight + 16;
+            }
+        });
+    },
+
+    validateTaskPositions() {
+        document.querySelectorAll('.task').forEach(task => {
+            const left = task.style.left;
+            const width = task.style.width;
+            task.title = `Position: ${left} | Width: ${width}`;
+        });
+    },
+
+    setupTaskButtons() {
+        // Gestionnaire pour le bouton "Nouvelle Tâche"
+        const addTaskBtn = document.getElementById('addTaskBtn');
+        if (addTaskBtn) {
+            addTaskBtn.addEventListener('click', () => {
+                ModalManager.openNewTaskModal();
+            });
+        }
+
+        // Gestionnaire pour les tâches existantes
+        document.querySelectorAll('.task').forEach(task => {
+            task.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const taskData = {
+                    id: task.dataset.taskId,
+                    projectId: task.closest('.timeline-row').dataset.projectId,
+                    text: task.dataset.taskInfo,
+                    comment: task.dataset.comment,
+                    startDate: task.dataset.startDate,
+                    endDate: task.dataset.endDate,
+                    etp: task.dataset.etp
+                };
+                ModalManager.openEditTaskModal(taskData);
+            });
+        });
+    }
+};
+
+
+// Gestionnaire des modals
+const ModalManager = {
+    init() {
+        this.initElements();
+        this.setupEventListeners();
+        this.setupProjectHandlers();
+        this.setupTaskHandlers();
+        this.initializeDateInputs();
+    },
+
+    initElements() {
+        this.elements = {
+            newProjectModal: document.getElementById('newProjectModal'),
+            newTaskModal: document.getElementById('newTaskModal'),
+            editTaskModal: document.getElementById('editTaskModal'),
+            projectForm: document.getElementById('projectForm'),
+            taskForm: document.getElementById('newTaskForm'),
+            editTaskForm: document.getElementById('editTaskForm'),
+            deleteTaskBtn: document.getElementById('deleteTaskBtn'),
+            deleteProjectBtn: document.getElementById('deleteProjectBtn'),
+            projectModalTitle: document.getElementById('projectModalTitle'),
+            submitProjectBtn: document.getElementById('submitProjectBtn'),
+            taskProjectSelect: document.getElementById('taskProject'),
+            editTaskProjectSelect: document.getElementById('editTaskProject'),
+            deleteTaskBtn: document.getElementById('deleteTaskBtn')
+        };
+    },
+
+    setupEventListeners() {
+        // Gestionnaires de fermeture des modals
+        document.querySelectorAll('.close, .close-modal').forEach(element => {
+            element.addEventListener('click', () => this.closeAllModals());
+        });
+
+        // Gestionnaire du formulaire de projet
+        if (this.elements.projectForm) {
+            this.elements.projectForm.addEventListener('submit', (e) => this.handleProjectSubmit(e));
+        }
+
+        // Gestion des formulaires de tâches
+        if (this.elements.taskForm) {
+            this.elements.taskForm.addEventListener('submit', (e) => this.handleTaskSubmit(e));
+        }
+
+        if (this.elements.editTaskForm) {
+            this.elements.editTaskForm.addEventListener('submit', (e) => this.handleEditTaskSubmit(e));
+        }
+
+        if (this.elements.deleteTaskBtn) {
+            this.elements.deleteTaskBtn.addEventListener('click', () => this.handleTaskDelete());
+        }
+
+        // Gestionnaire du bouton de suppression de projet
+        if (this.elements.deleteProjectBtn) {
+            this.elements.deleteProjectBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.handleProjectDelete();
+            });
+        }
+    },
+
+    
+    openNewProjectModal() {
+        const modal = this.elements.newProjectModal;
+        if (!modal) return;
+
+        // Reset du formulaire
+        this.elements.projectForm.reset();
+        document.getElementById('projectId').value = '';
+        
+        // Mise à jour du titre et des boutons
+        this.elements.projectModalTitle.textContent = 'Nouveau Projet';
+        this.elements.submitProjectBtn.textContent = 'Créer';
+        this.elements.deleteProjectBtn.style.display = 'none';
+
+        modal.classList.add('show');
+    },
+
+    openProjectEditModal(projectId, projectName, colorScheme) {
+        const modal = this.elements.newProjectModal;
+        if (!modal) return;
+
+        // Mise à jour du titre
+        this.elements.projectModalTitle.textContent = 'Modifier le Projet';
+
+        // Remplissage du formulaire
+        document.getElementById('projectId').value = projectId;
+        document.getElementById('projectName').value = projectName;
+        document.getElementById('colorScheme').value = colorScheme;
+
+        // Affichage du bouton de suppression et mise à jour du bouton de soumission
+        this.elements.deleteProjectBtn.style.display = 'block';
+        this.elements.submitProjectBtn.textContent = 'Modifier';
+
+        modal.classList.add('show');
+    },
+
+    async handleProjectSubmit(e) {
+        e.preventDefault();
+        const formData = new FormData(this.elements.projectForm);
+        const projectId = document.getElementById('projectId').value;
+        const method = projectId ? 'PUT' : 'POST';
+        const url = projectId ? `/project/api/projects/${projectId}` : '/project/api/projects';
+
+        try {
+            const response = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(Object.fromEntries(formData))
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Erreur lors de l\'opération sur le projet');
+            }
+
+            window.location.reload();
+        } catch (error) {
+            console.error('Error:', error);
+            alert(error.message);
+        }
+    },
+
+    async handleProjectDelete() {
+        const projectId = document.getElementById('projectId').value;
+        const projectName = document.getElementById('projectName').value;
+
+        if (confirm(`Êtes-vous sûr de vouloir supprimer le projet "${projectName}" ?\nCette action supprimera également toutes les tâches associées.`)) {
+            try {
+                const response = await fetch(`/project/api/projects/${projectId}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Erreur lors de la suppression du projet');
+                }
+
+                window.location.reload();
+            } catch (error) {
+                console.error('Error:', error);
+                alert(error.message);
+            }
+        }
+    },
+
+    initializeDateInputs() {
+        const dateInputs = document.querySelectorAll('input[type="date"]');
+        const today = new Date().toISOString().split('T')[0];
+        
+        dateInputs.forEach(input => {
+            input.min = today;
+            
+            // Pour les inputs de date de fin, mettre à jour le min quand la date de début change
+            if (input.id.includes('End')) {
+                const startInput = document.getElementById(input.id.replace('End', 'Start'));
+                if (startInput) {
+                    startInput.addEventListener('change', () => {
+                        input.min = startInput.value;
+                        if (input.value && input.value < startInput.value) {
+                            input.value = startInput.value;
+                        }
+                    });
+                }
+            }
+        });
+    },
+
+    openNewTaskModal() {
+        const modal = this.elements.newTaskModal;
+        if (!modal) return;
+
+        this.elements.taskForm.reset();
+        this.updateProjectSelect();
+        modal.classList.add('show');
+    },
+
+    openEditTaskModal(taskData) {
+        const modal = this.elements.editTaskModal;
+        if (!modal) return;
+
+        // Remplir le formulaire avec les données de la tâche
+        document.getElementById('editTaskId').value = taskData.id;
+        document.getElementById('editTaskProject').value = taskData.projectId;
+        document.getElementById('editTaskText').value = taskData.text;
+        document.getElementById('editTaskComment').value = taskData.comment || '';
+        document.getElementById('editTaskStartDate').value = taskData.startDate;
+        document.getElementById('editTaskEndDate').value = taskData.endDate;
+        document.getElementById('editTaskEtp').value = taskData.etp;
+
+        modal.classList.add('show');
+    },
+
+    async handleTaskSubmit(e) {
+        e.preventDefault();
+        const formData = new FormData(this.elements.taskForm);
+        
+        try {
+            const response = await fetch('/project/api/tasks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(Object.fromEntries(formData))
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Erreur lors de la création de la tâche');
+            }
+
+            window.location.reload();
+        } catch (error) {
+            console.error('Error:', error);
+            alert(error.message);
+        }
+    },
+
+    async handleEditTaskSubmit(e) {
+        e.preventDefault();
+        const formData = new FormData(this.elements.editTaskForm);
+        const taskId = formData.get('task_id');
+        
+        try {
+            const response = await fetch(`/project/api/tasks/${taskId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(Object.fromEntries(formData))
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Erreur lors de la modification de la tâche');
+            }
+
+            window.location.reload();
+        } catch (error) {
+            console.error('Error:', error);
+            alert(error.message);
+        }
+    },
+
+    async handleTaskDelete() {
+        const taskId = document.getElementById('editTaskId').value;
+        const taskText = document.getElementById('editTaskText').value;
+        
+        if (confirm(`Êtes-vous sûr de vouloir supprimer la tâche "${taskText}" ?`)) {
+            try {
+                const response = await fetch(`/project/api/tasks/${taskId}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Erreur lors de la suppression de la tâche');
+                }
+
+                window.location.reload();
+            } catch (error) {
+                console.error('Error:', error);
+                alert(error.message);
+            }
+        }
+    },
+
+    async updateProjectSelect() {
+        try {
+            const response = await fetch('/project/api/projects');
+            if (!response.ok) throw new Error('Erreur lors de la récupération des projets');
+            
+            const data = await response.json();
+            
+            [this.elements.taskProjectSelect, this.elements.editTaskProjectSelect].forEach(select => {
+                if (select) {
+                    select.innerHTML = '';
+                    data.data.projects.forEach(project => {
+                        const option = document.createElement('option');
+                        option.value = project.id;
+                        option.textContent = project.name;
+                        select.appendChild(option);
+                    });
+                }
+            });
+        } catch (error) {
+            console.error('Error updating project selects:', error);
+            alert('Erreur lors de la mise à jour de la liste des projets');
+        }
+    },
+
+    closeAllModals() {
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.classList.remove('show');
+        });
+    },
+
+    // ... Le reste du code pour la gestion des tâches reste inchangé
+};
+
+// Initialisation
+document.addEventListener('DOMContentLoaded', function() {
+    TimelineManager.init();
+    ModalManager.init();
+});
+```
+
+### 39d8da607c36_add_comment.py
+```py
+"""add comment
+
+Revision ID: 39d8da607c36
+Revises: 
+Create Date: 2025-02-15 21:56:57.374722
+
+"""
+from alembic import op
+import sqlalchemy as sa
+
+
+# revision identifiers, used by Alembic.
+revision = '39d8da607c36'
+down_revision = None
+branch_labels = None
+depends_on = None
+
+
+def upgrade():
+    # ### commands auto generated by Alembic - please adjust! ###
+    with op.batch_alter_table('tasks', schema=None) as batch_op:
+        batch_op.add_column(sa.Column('comment', sa.Text(), nullable=True))
+
+    # ### end Alembic commands ###
+
+
+def downgrade():
+    # ### commands auto generated by Alembic - please adjust! ###
+    with op.batch_alter_table('tasks', schema=None) as batch_op:
+        batch_op.drop_column('comment')
+
+    # ### end Alembic commands ###
+
+```
+
+### etp_table.js
+```js
+// static/js/project/etp_table.js
+
+document.addEventListener('DOMContentLoaded', function() {
+    const table = document.querySelector('.etp-table');
+    let activeInput = null;
+
+    // Gérer le clic sur une cellule éditable
+    document.addEventListener('click', function(e) {
+        const cell = e.target.closest('.editable-cell');
+        if (!cell) return;
+        if (cell.querySelector('input')) return;
+
+        const valueSpan = cell.querySelector('.etp-value');
+        const currentValue = valueSpan.textContent.trim();
+
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.step = '0.1';
+        input.min = '0';
+        input.value = currentValue;
+        input.className = 'etp-input';
+
+        valueSpan.style.display = 'none';
+        cell.appendChild(input);
+        input.focus();
+        activeInput = input;
+
+        input.select();
+    });
+
+    // Gérer la validation des modifications
+    async function saveChange(cell, newValue) {
+        const project = cell.closest('tr').dataset.project;
+        const period = cell.dataset.period;
+
+        try {
+            const response = await fetch('/project/api/update_etp', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    project,
+                    period,
+                    etp: newValue
+                })
+            });
+
+            if (!response.ok) throw new Error('Failed to update ETP');
+
+            const valueSpan = cell.querySelector('.etp-value');
+            valueSpan.textContent = parseFloat(newValue).toFixed(2);
+            valueSpan.style.display = '';
+            valueSpan.classList.add('updated');
+            
+            if (cell.querySelector('input')) {
+                cell.querySelector('input').remove();
+            }
+
+            updateTotals();
+            
+        } catch (error) {
+            console.error('Error updating ETP:', error);
+            alert('Failed to update ETP');
+        }
+    }
+
+    // Gérer les touches clavier pendant l'édition
+    document.addEventListener('keydown', function(e) {
+        if (!activeInput) return;
+        
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const newValue = activeInput.value;
+            if (newValue && !isNaN(newValue)) {
+                const cell = activeInput.closest('.editable-cell');
+                saveChange(cell, newValue);
+            }
+            activeInput = null;
+        } else if (e.key === 'Escape') {
+            const cell = activeInput.closest('.editable-cell');
+            cell.querySelector('.etp-value').style.display = '';
+            activeInput.remove();
+            activeInput = null;
+        }
+    });
+
+    // Gérer la perte de focus
+    document.addEventListener('click', function(e) {
+        if (activeInput && !activeInput.contains(e.target) && !e.target.closest('.editable-cell')) {
+            const newValue = activeInput.value;
+            if (newValue && !isNaN(newValue)) {
+                const cell = activeInput.closest('.editable-cell');
+                saveChange(cell, newValue);
+            }
+            activeInput = null;
+        }
+    });
+
+    // Fonction pour mettre à jour tous les totaux
+    function updateTotals() {
+        // Totaux par période
+        const periods = ['2025 Q1-Q2', '2025 Q3-Q4', '2026-2027'];
+        
+        periods.forEach(period => {
+            const cells = table.querySelectorAll(`td[data-period="${period}"] .etp-value`);
+            const total = Array.from(cells)
+                .reduce((sum, cell) => sum + parseFloat(cell.textContent || 0), 0);
+            const totalCell = table.querySelector(`.period-total[data-period="${period}"]`);
+            if (totalCell) {
+                totalCell.textContent = total.toFixed(2);
+                totalCell.classList.add('updated');
+            }
+        });
+
+        // Totaux par ligne (max ETP)
+        const projectRows = table.querySelectorAll('tr[data-project]');
+        projectRows.forEach(row => {
+            const etpCells = row.querySelectorAll('.etp-value');
+            const maxEtp = Array.from(etpCells)
+                .reduce((max, cell) => Math.max(max, parseFloat(cell.textContent || 0)), 0);
+            const totalCell = row.querySelector('.row-total');
+            if (totalCell) {
+                totalCell.textContent = maxEtp.toFixed(2);
+                totalCell.classList.add('updated');
+            }
+        });
+
+        // Total général (somme des max ETP)
+        const rowTotals = Array.from(table.querySelectorAll('.row-total'))
+            .map(cell => parseFloat(cell.textContent || 0));
+        const grandTotal = rowTotals.reduce((sum, val) => sum + val, 0);
+        const grandTotalCell = table.querySelector('.grand-total');
+        if (grandTotalCell) {
+            grandTotalCell.textContent = grandTotal.toFixed(2);
+            grandTotalCell.classList.add('updated');
+        }
+
+        // Retirer les classes 'updated' après l'animation
+        setTimeout(() => {
+            table.querySelectorAll('.updated').forEach(el => {
+                el.classList.remove('updated');
+            });
+        }, 1000);
+    }
+});
 ```
 

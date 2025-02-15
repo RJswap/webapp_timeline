@@ -13,10 +13,10 @@
         <!-- Boutons d'action -->
         <div class="action-buttons">
             <button id="addProjectBtn" class="btn-primary">
-                <i class="fas fa-plus"></i> Nouveau Projet
+                <i class="fas fa-plus"></i> New Stream
             </button>
             <button id="addTaskBtn" class="btn-primary">
-                <i class="fas fa-plus"></i> Nouvelle Tâche
+                <i class="fas fa-plus"></i> New Task
             </button>
         </div>
         
@@ -42,11 +42,19 @@
                                 style="left: {{ task.start }}%; width: {{ task.width }}%;"
                                 data-task-id="{{ task.id }}"
                                 data-task-info="{{ task.text }}"
+                                data-comment="{{ task.comment }}"
                                 data-dates="{{ task.dates }}"
                                 data-start-date="{{ task.raw_start_date }}"
                                 data-end-date="{{ task.raw_end_date }}"
                                 data-etp="{{ task.etp }}">
                                 {{ task.text }}
+                                <div class="task-tooltip">
+                                    <div class="dates">{{ task.dates }}</div>
+                                    {% if task.comment %}
+                                    <div class="comment">{{ task.comment }}</div>
+                                    {% endif %}
+                                </div>
+                            
                             </div>
                             {% endfor %}
                         </div>
@@ -117,6 +125,10 @@
                     <input type="text" id="taskText" name="text" required>
                 </div>
                 <div class="form-group">
+                    <label for="taskComment">Commentaire</label>
+                    <textarea id="taskComment" name="comment" rows="3"></textarea>
+                </div>
+                <div class="form-group">
                     <label for="taskStartDate">Date de début</label>
                     <input type="date" id="taskStartDate" name="start_date" required>
                 </div>
@@ -153,6 +165,10 @@
                 <div class="form-group">
                     <label for="editTaskText">Description</label>
                     <input type="text" id="editTaskText" name="text" required>
+                </div>
+                <div class="form-group">
+                    <label for="editTaskComment">Commentaire</label>
+                    <textarea id="editTaskComment" name="comment" rows="3"></textarea>
                 </div>
                 <div class="form-group">
                     <label for="editTaskStartDate">Date de début</label>

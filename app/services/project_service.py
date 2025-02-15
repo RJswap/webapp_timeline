@@ -40,7 +40,8 @@ class ProjectService:
         start_date: date,
         end_date: date,
         color: str,
-        etp: float = 1.0
+        etp: float = 1.0,
+        comment: str = None
     ) -> Optional[Task]:
         try:
             # Récupérer le projet pour obtenir son schéma de couleur
@@ -59,6 +60,7 @@ class ProjectService:
             task = Task(
                 project_id=project_id,
                 text=text,
+                comment=comment,
                 start_date=start_date,
                 end_date=end_date,
                 color=color,
