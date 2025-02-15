@@ -42,6 +42,18 @@ class ProjectService:
         etp: float = 1.0
     ) -> Optional[Task]:
         try:
+            # Récupérer le projet pour obtenir son schéma de couleur
+            project = Project.query.get(project_id)
+            if not project:
+                raise ValueError("Project not found")
+
+            # Si aucune couleur n'est spécifiée, utiliser le schéma de couleur du projet
+            if color is None:
+                # Déterminer l'intensité en fonction du nombre de tâches existantes
+                intensities = ['600', '500', '400']
+                intensity = intensities[len(project.tasks) % len(intensities)]
+                color = f"{project.color_scheme}-{intensity}"
+
             print(f"Creating task in service: {project_id}, {text}, {start_date}-{end_date}, {color}")
             task = Task(
                 project_id=project_id,
