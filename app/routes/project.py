@@ -1,8 +1,7 @@
-from flask import Blueprint, render_template
-from flask import jsonify, request
 from flask import redirect, url_for
-from app.services.project_service import ProjectService
-from app.services.etp_service import EtpService
+from flask import Blueprint, render_template, jsonify, request
+from app.services import ProjectService, EtpService
+from app.models import Project
 from app.constants import TimeConstants
 
 bp = Blueprint('project', __name__, url_prefix='/project')
@@ -38,7 +37,6 @@ def etp_table():
 @bp.route('/api/update_etp', methods=['POST'])
 def update_etp():
     try:
-        # Validate request data
         if not request.is_json:
             return jsonify({
                 'status': 'error',
@@ -68,8 +66,16 @@ def update_etp():
                 'message': f'Invalid ETP value: {str(e)}'
             }), 400
         
+        # Get project by name
+        project = Project.query.filter_by(name=project_name).first()
+        if not project:
+            return jsonify({
+                'status': 'error',
+                'message': f'Project not found: {project_name}'
+            }), 404
+        
         # Update ETP in database
-        EtpService.update_etp(project_name, period, new_etp)
+        EtpService.update_etp(project.id, period, new_etp)
         
         return jsonify({
             'status': 'success',
@@ -82,7 +88,6 @@ def update_etp():
         })
 
     except Exception as e:
-        app.logger.error(f"Error updating ETP: {str(e)}")
         return jsonify({
             'status': 'error',
             'message': f'Failed to update ETP: {str(e)}'

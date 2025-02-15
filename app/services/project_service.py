@@ -1,81 +1,102 @@
-from typing import List
+from typing import List, Optional
 from datetime import date
-from app.models.project import Project
-from app.models.task import Task
+from app import db
+from typing import List, Optional
+from datetime import date
+from app import db
+from app.models import Project, Task
 from app.services.etp_service import EtpService
+from sqlalchemy.exc import IntegrityError
 
 class ProjectService:
     @staticmethod
     def get_all_projects() -> List[Project]:
-        # Cette fonction pourrait plus tard récupérer les données depuis une base de données
-        projects = [
-            Project(
-                name="Procurement",
-                tasks=[
-                    Task(start_date=date(2025,3,1), end_date=date(2025, 5, 1), color="blue-600", text="Contrats & RFI"),
-                    Task(start_date=date(2025,5,1), end_date=date(2025, 9, 1), color="blue-500", text="RFP & Négociations")
-                ]
-            ),
-             Project(
-                name="Workforce & HR",
-                tasks=[
-                    Task(start_date=date(2025,3,1), end_date=date(2025, 5, 1), color="purple-600", text="Initiation"),
-                    Task(start_date=date(2025,5,1), end_date=date(2025, 9, 1), color="purple-500", text="Analyse & Design"),
-                    Task(start_date=date(2025,9,1), end_date=date(2027, 12, 30), color="purple-400", text="Accompagnement & Déploiement")
-                ]
-            ),
-            Project(
-                name="EUS",
-                tasks=[
-                    Task(start_date=date(2025,2,1), end_date=date(2025, 5, 1), color="green-600", text="Due Diligence"),
-                    Task(start_date=date(2025,5,1), end_date=date(2025, 9, 1), color="green-500", text="RFP (3 ETP)"),
-                    Task(start_date=date(2025,9,1), end_date=date(2025, 12, 30), color="green-400", text="Pilot & Deploy")
-                ]
-            ),
-            Project(
-                name="VIP/Events",
-                tasks=[
-                    Task(start_date=date(2025,3,1), end_date=date(2025, 5, 1), color="yellow-600", text="Analyse & Design")
-                ]
-            ),
-            Project(
-                name="Employee Experience",
-                tasks=[
-                    Task(start_date=date(2025,3,1), end_date=date(2025, 5, 1), color="red-600", text="Benchmark & Design"),
-                    Task(start_date=date(2025,5,1), end_date=date(2025, 9, 1), color="red-500", text="Implementation & Optimization")
-                ]
-            ),
-            Project(
-                name="Process Data Analytics",
-                tasks=[
-                    Task(start_date=date(2025,2,1), end_date=date(2025, 4, 30), color="indigo-600", text="Audit & Roadmap"),
-                    Task(start_date=date(2025,5,1), end_date=date(2025, 6, 30), color="indigo-500", text="Implementation & Migration")
-                ]
-            ),
-            Project(
-                name="Observability",
-                tasks=[
-                    Task(start_date=date(2025,2,1), end_date=date(2025, 4, 30), color="teal-600", text="Strategy & Design"),
-                    Task(start_date=date(2025,5,1), end_date=date(2025, 6, 30), color="teal-500", text="POC & Implementation")
-                ]
-            ),
-            Project(
-                name="TOM",
-                tasks=[
-                    Task(start_date=date(2025,2,1), end_date=date(2025, 4, 30), color="gray-600", text="Analysis & Design"),
-                    Task(start_date=date(2025,5,1), end_date=date(2025, 6, 30), color="gray-500", text="Implementation & Transition")
-                ]
-            )
-        ]
+        return Project.query.all()
     
-        for project in projects:
-            for task in project.tasks:
-                stored_etp = EtpService.get_task_etp_by_date(
-                    project.name,
-                    task.start_date,
-                    task.etp or 1.0
-                )
-                task.text = f"{task.text} ({stored_etp} ETP)"
-                task.etp = stored_etp
+    @staticmethod
+    def get_project_by_id(project_id: int) -> Optional[Project]:
+        return Project.query.get(project_id)
+    
+    @staticmethod
+    def get_project_by_name(name: str) -> Optional[Project]:
+        return Project.query.filter_by(name=name).first()
+    
+    @staticmethod
+    def create_project(name: str) -> Project:
+        project = Project(name=name)
+        db.session.add(project)
+        try:
+            db.session.commit()
+            return project
+        except IntegrityError:
+            db.session.rollback()
+            raise ValueError(f"Project with name '{name}' already exists")
+    
+    @staticmethod
+    def create_task(
+        project_id: int,
+        text: str,
+        start_date: date,
+        end_date: date,
+        color: str,
+        etp: float = 1.0
+    ) -> Task:
+        task = Task(
+            project_id=project_id,
+            text=text,
+            start_date=start_date,
+            end_date=end_date,
+            color=color,
+            etp=etp
+        )
+        db.session.add(task)
+        db.session.commit()
+        return task
+    
+    @staticmethod
+    def update_task(
+        task_id: int,
+        text: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        color: Optional[str] = None,
+        etp: Optional[float] = None
+    ) -> Optional[Task]:
+        task = Task.query.get(task_id)
+        if not task:
+            return None
+            
+        if text is not None:
+            task.text = text
+        if start_date is not None:
+            task.start_date = start_date
+        if end_date is not None:
+            task.end_date = end_date
+        if color is not None:
+            task.color = color
+        if etp is not None:
+            task.etp = etp
+            
+        db.session.commit()
+        return task
+    
+    @staticmethod
+    def delete_task(task_id: int) -> bool:
+        task = Task.query.get(task_id)
+        if not task:
+            return False
+            
+        db.session.delete(task)
+        db.session.commit()
+        return True
+    
+    @staticmethod
+    def delete_project(project_id: int) -> bool:
+        project = Project.query.get(project_id)
+        if not project:
+            return False
+            
+        db.session.delete(project)
+        db.session.commit()
+        return True
 
-        return projects

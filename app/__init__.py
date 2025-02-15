@@ -13,8 +13,8 @@ def create_app(config_class=DevelopmentConfig):
     
     # Register blueprints
     from app.routes import main, project
-    app.register_blueprint(main.bp)
-    app.register_blueprint(project.bp)
+    app.register_blueprint(main)
+    app.register_blueprint(project)
     
     # Create database tables
     with app.app_context():

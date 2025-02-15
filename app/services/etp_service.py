@@ -1,18 +1,16 @@
 from collections import defaultdict
 from typing import List, Dict, Tuple
-from datetime import date
-from app.models.project import Project
-from app.models.etp_entry import EtpEntry
-from app.constants import TimeConstants
-from datetime import datetime
+from datetime import date, datetime
 from app import db
+from app.models import Project, EtpEntry
+from app.constants import TimeConstants
 
 class EtpService:
     @staticmethod
-    def get_stored_etp(project_name: str, period: str) -> float:
+    def get_stored_etp(project_id: int, period: str) -> float:
         """Récupère la valeur ETP stockée pour un projet et une période donnés"""
         entry = EtpEntry.query.filter_by(
-            project_name=project_name,
+            project_id=project_id,
             period=period
         ).first()
         return entry.etp_value if entry else None
@@ -29,10 +27,10 @@ class EtpService:
             return "2026-2027"
 
     @staticmethod
-    def get_task_etp_by_date(project_name: str, task_date: date, default_etp: float) -> float:
+    def get_task_etp_by_date(project_id: int, task_date: date, default_etp: float) -> float:
         """Récupère l'ETP pour une tâche à une date spécifique"""
         period = EtpService.get_period_for_date(task_date)
-        stored_etp = EtpService.get_stored_etp(project_name, period)
+        stored_etp = EtpService.get_stored_etp(project_id, period)
         return stored_etp if stored_etp is not None else default_etp
 
     @staticmethod
@@ -44,7 +42,7 @@ class EtpService:
             project_etps = defaultdict(float)
             max_etp = 0
             
-            stored_etps = EtpEntry.query.filter_by(project_name=project.name).all()
+            stored_etps = EtpEntry.query.filter_by(project_id=project.id).all()
             stored_etps_dict = {entry.period: entry.etp_value for entry in stored_etps}
             
             for task in project.tasks:
@@ -83,10 +81,10 @@ class EtpService:
         return etp_data, period_totals
 
     @staticmethod
-    def update_etp(project_name: str, period: str, etp_value: float) -> None:
+    def update_etp(project_id: int, period: str, etp_value: float) -> None:
         """Update ETP value in database"""
         entry = EtpEntry.query.filter_by(
-            project_name=project_name,
+            project_id=project_id,
             period=period
         ).first()
         
@@ -95,7 +93,7 @@ class EtpService:
             entry.updated_at = datetime.utcnow()
         else:
             entry = EtpEntry(
-                project_name=project_name,
+                project_id=project_id,
                 period=period,
                 etp_value=etp_value
             )

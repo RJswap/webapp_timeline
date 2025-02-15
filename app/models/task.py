@@ -1,44 +1,30 @@
-from dataclasses import dataclass
-import re
-from typing import Optional
-from datetime import date, datetime
+from app import db
+from datetime import datetime, date
 
-@dataclass
-class Task:
-    start_date: date
-    end_date: date
-    color: str
-    text: str
-    etp: Optional[float] = None
+class Task(db.Model):
+    __tablename__ = 'tasks'
     
-    def __post_init__(self):
-        if self.etp is None:
-            self.etp = self._extract_etp_from_text()
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
+    text = db.Column(db.String(200), nullable=False)
+    start_date = db.Column(db.Date, nullable=False)
+    end_date = db.Column(db.Date, nullable=False)
+    color = db.Column(db.String(50), nullable=False)
+    etp = db.Column(db.Float, default=1.0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    def _extract_etp_from_text(self) -> float:
-        etp_pattern = r'\((\d*\.?\d+)\s*ETP\)'
-        match = re.search(etp_pattern, self.text)
-        return float(match.group(1)) if match else 0.0
-    
-    def _calculate_grid_position(self) -> tuple[float, float]:
-        """Calcule la position relative dans la grille.
-        La grille est divisée en 5 colonnes égales de 20% chacune:
-        - 2025 Q1: 0-20%
-        - 2025 Q2: 20-40%
-        - 2025 Q3: 40-60%
-        - 2025 Q4: 60-80%
-        - 2026-2027: 80-100%
-        """
+    def _calculate_grid_position(self):
+        """Calcule la position relative dans la grille."""
         def get_quarter_position(d: date) -> float:
             if d.year > 2025:
                 return 80.0
             
-            quarter = (d.month - 1) // 3  # 0-3 pour Q1-Q4
-            base_position = quarter * 20.0  # Position de début du trimestre
+            quarter = (d.month - 1) // 3
+            base_position = quarter * 20.0
             
-            # Position relative dans le trimestre (0-20%)
             month_in_quarter = (d.month - 1) % 3
-            days_in_quarter = 90  # Approximation pour un calcul plus simple
+            days_in_quarter = 90
             days_from_quarter_start = (month_in_quarter * 30) + (d.day - 1)
             relative_position = (days_from_quarter_start / days_in_quarter) * 20.0
             
@@ -47,31 +33,22 @@ class Task:
         start_pos = get_quarter_position(self.start_date)
         end_pos = get_quarter_position(self.end_date)
         
-        # Ajuster la largeur pour les tâches qui traversent les trimestres
-        if end_pos < start_pos:  # Si la tâche se termine en 2026-2027
+        if end_pos < start_pos:
             end_pos = 100.0
         
-        # Calculer la largeur
         width = end_pos - start_pos
         
-        # Ajuster la largeur minimale pour la visibilité
         if width < 15 and (self.end_date.month - self.start_date.month >= 1):
-            width = 15  # Largeur minimum pour les tâches de 2 mois ou plus
+            width = 15
         elif width < 8:
-            width = 8  # Largeur minimum pour les tâches courtes
-        
-        # Pour débogage
-        print(f"Task: {self.text}")
-        print(f"Dates: {self.start_date} -> {self.end_date}")
-        print(f"Position: {start_pos:.1f}% -> {end_pos:.1f}%")
-        print(f"Width: {width:.1f}%")
-        print("---")
+            width = 8
         
         return start_pos, width
     
     def to_dict(self):
         start, width = self._calculate_grid_position()
         return {
+            'id': self.id,
             'start': start,
             'width': width,
             'color': self.color,
