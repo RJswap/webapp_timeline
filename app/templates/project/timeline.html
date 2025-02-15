@@ -31,7 +31,10 @@
 
                 <div class="timeline-rows-container">
                     {% for project in projects %}
-                    <div class="timeline-row" data-project-name="{{ project.name }}">
+                    <div class="timeline-row" 
+                         data-project-name="{{ project.name }}" 
+                         data-project-id="{{ project.id }}"
+                         data-color-scheme="{{ project.color_scheme }}">
                         <div class="project-name">{{ project.name }}</div>
                         <div class="project-tasks">
                             {% for task in project.tasks %}
@@ -57,14 +60,17 @@
     <div id="newProjectModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Nouveau Projet</h2>
+                <h2 id="projectModalTitle">Nouveau Projet</h2>
                 <span class="close">&times;</span>
             </div>
-            <form id="newProjectForm">
+            <form id="projectForm">
+                <input type="hidden" id="projectId" name="project_id" value="">
+                
                 <div class="form-group">
                     <label for="projectName">Nom du projet</label>
                     <input type="text" id="projectName" name="name" required>
                 </div>
+                
                 <div class="form-group">
                     <label for="colorScheme">Schéma de couleur</label>
                     <select id="colorScheme" name="colorScheme" required>
@@ -78,9 +84,15 @@
                         <option value="gray">Gris</option>
                     </select>
                 </div>
+                
                 <div class="modal-footer">
-                    <button type="submit" class="btn-primary">Créer</button>
-                    <button type="button" class="btn-secondary close-modal">Annuler</button>
+                    <button type="button" id="deleteProjectBtn" class="btn-danger" style="display: none;">
+                        Supprimer le projet
+                    </button>
+                    <div class="action-buttons">
+                        <button type="submit" id="submitProjectBtn" class="btn-primary">Créer</button>
+                        <button type="button" class="btn-secondary close-modal">Annuler</button>
+                    </div>
                 </div>
             </form>
         </div>

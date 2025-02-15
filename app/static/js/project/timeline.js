@@ -1,19 +1,52 @@
-// static/js/project/timeline.js
+// Gestionnaire de la timeline
+const TimelineManager = {
+    init() {
+        this.timelineRows = document.querySelectorAll('.timeline-row');
+        this.setupStreamToggles();
+        this.validateTaskPositions();
+        this.setupProjectButtons();
+        this.setupTaskButtons();
+    },
 
-document.addEventListener('DOMContentLoaded', function() {
-    const timelineRows = document.querySelectorAll('.timeline-row');
-    
-    // Créer la barre de toggles
-    const streamToggles = document.createElement('div');
-    streamToggles.className = 'stream-toggles';
-    
-    // Créer un toggle pour chaque projet
-    timelineRows.forEach((row) => {
+    setupStreamToggles() {
+        const streamToggles = document.createElement('div');
+        streamToggles.className = 'stream-toggles';
+        
+        this.timelineRows.forEach((row) => {
+            const toggleWrapper = this.createToggle(row);
+            streamToggles.appendChild(toggleWrapper);
+        });
+        
+        const timelineContainer = document.querySelector('.timeline-container');
+        timelineContainer.insertBefore(streamToggles, timelineContainer.querySelector('.timeline-grid'));
+    },
+
+    setupProjectButtons() {
+        // Gérer le bouton "Nouveau Projet"
+        const addProjectBtn = document.getElementById('addProjectBtn');
+        if (addProjectBtn) {
+            addProjectBtn.addEventListener('click', () => {
+                ModalManager.openNewProjectModal();
+            });
+        }
+
+        // Gérer les clics sur les noms de projets
+        document.querySelectorAll('.project-name').forEach(projectName => {
+            projectName.addEventListener('click', (e) => {
+                e.preventDefault();
+                const projectId = projectName.closest('.timeline-row').dataset.projectId;
+                const projectTitle = projectName.textContent.trim();
+                const colorScheme = projectName.closest('.timeline-row').dataset.colorScheme || 'blue';
+                ModalManager.openProjectEditModal(projectId, projectTitle, colorScheme);
+            });
+        });
+    },
+
+    createToggle(row) {
         const projectName = row.dataset.projectName;
         const toggleWrapper = document.createElement('div');
         toggleWrapper.className = 'stream-toggle';
         
-        // Créer le switch
         const label = document.createElement('label');
         label.className = 'switch';
         
@@ -27,27 +60,21 @@ document.addEventListener('DOMContentLoaded', function() {
         label.appendChild(input);
         label.appendChild(slider);
         
-        // Ajouter le label du projet
         const nameLabel = document.createElement('span');
         nameLabel.textContent = projectName;
         
         toggleWrapper.appendChild(label);
         toggleWrapper.appendChild(nameLabel);
-        streamToggles.appendChild(toggleWrapper);
         
-        // Gestionnaire d'événements pour le toggle
-        input.addEventListener('change', function() {
-            const isVisible = this.checked;
-            toggleRowVisibility(row, isVisible);
-            updatePositions();
+        input.addEventListener('change', () => {
+            this.toggleRowVisibility(row, input.checked);
+            this.updatePositions();
         });
-    });
-    
-    // Insérer la barre de toggles avant la timeline
-    const timelineContainer = document.querySelector('.timeline-container');
-    timelineContainer.insertBefore(streamToggles, timelineContainer.querySelector('.timeline-grid'));
-    
-    function toggleRowVisibility(row, isVisible) {
+        
+        return toggleWrapper;
+    },
+
+    toggleRowVisibility(row, isVisible) {
         if (isVisible) {
             row.classList.remove('hidden');
             row.style.height = '';
@@ -57,269 +84,350 @@ document.addEventListener('DOMContentLoaded', function() {
             row.style.height = '0';
             row.style.opacity = '0';
         }
-    }
-    
-    function updatePositions() {
+    },
+
+    updatePositions() {
         let currentOffset = 0;
-        timelineRows.forEach(row => {
+        this.timelineRows.forEach(row => {
             if (!row.classList.contains('hidden')) {
-                currentOffset += row.offsetHeight + 16; // 16px pour le gap
+                currentOffset += row.offsetHeight + 16;
             }
         });
-    }
+    },
 
-    document.querySelectorAll('.task').forEach(task => {
-        const left = task.style.left;
-        const width = task.style.width;
-        
-        console.log(`Task: ${task.textContent.trim()}`);
-        console.log(`Position CSS - left: ${left}, width: ${width}`);
-        console.log(`Container width: ${task.parentElement.offsetWidth}px`);
-        console.log('---');
-        
-        // Valider visuellement les positions
-        task.title = `Position: ${left} | Width: ${width}`;
-    });
-    
-});
-
-
-
-
-document.addEventListener('DOMContentLoaded', function() {
-    // Éléments du DOM
-    const newProjectModal = document.getElementById('newProjectModal');
-    const newTaskModal = document.getElementById('newTaskModal');
-    const addProjectBtn = document.getElementById('addProjectBtn');
-    const addTaskBtn = document.getElementById('addTaskBtn');
-    const projectForm = document.getElementById('newProjectForm');
-    const taskForm = document.getElementById('newTaskForm');
-    
-    // Gestionnaires d'ouverture des modals
-    addProjectBtn.addEventListener('click', () => openModal(newProjectModal));
-    addTaskBtn.addEventListener('click', async () => {
-        await updateProjectSelect();
-        openModal(newTaskModal);
-    });
-    
-    // Fermeture des modals
-    document.querySelectorAll('.close, .close-modal').forEach(element => {
-        element.addEventListener('click', () => {
-            newProjectModal.classList.remove('show');
-            newTaskModal.classList.remove('show');
+    validateTaskPositions() {
+        document.querySelectorAll('.task').forEach(task => {
+            const left = task.style.left;
+            const width = task.style.width;
+            task.title = `Position: ${left} | Width: ${width}`;
         });
-    });
+    },
+
+    setupTaskButtons() {
+        // Gestionnaire pour le bouton "Nouvelle Tâche"
+        const addTaskBtn = document.getElementById('addTaskBtn');
+        if (addTaskBtn) {
+            addTaskBtn.addEventListener('click', () => {
+                ModalManager.openNewTaskModal();
+            });
+        }
+
+        // Gestionnaire pour les tâches existantes
+        document.querySelectorAll('.task').forEach(task => {
+            task.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const taskData = {
+                    id: task.dataset.taskId,
+                    projectId: task.closest('.timeline-row').dataset.projectId,
+                    text: task.dataset.taskInfo,
+                    startDate: task.dataset.startDate,
+                    endDate: task.dataset.endDate,
+                    etp: task.dataset.etp
+                };
+                ModalManager.openEditTaskModal(taskData);
+            });
+        });
+    }
+};
+
+
+// Gestionnaire des modals
+const ModalManager = {
+    init() {
+        this.initElements();
+        this.setupEventListeners();
+        this.setupProjectHandlers();
+        this.setupTaskHandlers();
+        this.initializeDateInputs();
+    },
+
+    initElements() {
+        this.elements = {
+            newProjectModal: document.getElementById('newProjectModal'),
+            newTaskModal: document.getElementById('newTaskModal'),
+            editTaskModal: document.getElementById('editTaskModal'),
+            projectForm: document.getElementById('projectForm'),
+            taskForm: document.getElementById('newTaskForm'),
+            editTaskForm: document.getElementById('editTaskForm'),
+            deleteTaskBtn: document.getElementById('deleteTaskBtn'),
+            deleteProjectBtn: document.getElementById('deleteProjectBtn'),
+            projectModalTitle: document.getElementById('projectModalTitle'),
+            submitProjectBtn: document.getElementById('submitProjectBtn'),
+            taskProjectSelect: document.getElementById('taskProject'),
+            editTaskProjectSelect: document.getElementById('editTaskProject'),
+            deleteTaskBtn: document.getElementById('deleteTaskBtn')
+        };
+    },
+
+    setupEventListeners() {
+        // Gestionnaires de fermeture des modals
+        document.querySelectorAll('.close, .close-modal').forEach(element => {
+            element.addEventListener('click', () => this.closeAllModals());
+        });
+
+        // Gestionnaire du formulaire de projet
+        if (this.elements.projectForm) {
+            this.elements.projectForm.addEventListener('submit', (e) => this.handleProjectSubmit(e));
+        }
+
+        // Gestion des formulaires de tâches
+        if (this.elements.taskForm) {
+            this.elements.taskForm.addEventListener('submit', (e) => this.handleTaskSubmit(e));
+        }
+
+        if (this.elements.editTaskForm) {
+            this.elements.editTaskForm.addEventListener('submit', (e) => this.handleEditTaskSubmit(e));
+        }
+
+        if (this.elements.deleteTaskBtn) {
+            this.elements.deleteTaskBtn.addEventListener('click', () => this.handleTaskDelete());
+        }
+
+        // Gestionnaire du bouton de suppression de projet
+        if (this.elements.deleteProjectBtn) {
+            this.elements.deleteProjectBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.handleProjectDelete();
+            });
+        }
+    },
+
     
-    // Soumission du formulaire de projet
-    projectForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const formData = new FormData(projectForm);
+    openNewProjectModal() {
+        const modal = this.elements.newProjectModal;
+        if (!modal) return;
+
+        // Reset du formulaire
+        this.elements.projectForm.reset();
+        document.getElementById('projectId').value = '';
         
+        // Mise à jour du titre et des boutons
+        this.elements.projectModalTitle.textContent = 'Nouveau Projet';
+        this.elements.submitProjectBtn.textContent = 'Créer';
+        this.elements.deleteProjectBtn.style.display = 'none';
+
+        modal.classList.add('show');
+    },
+
+    openProjectEditModal(projectId, projectName, colorScheme) {
+        const modal = this.elements.newProjectModal;
+        if (!modal) return;
+
+        // Mise à jour du titre
+        this.elements.projectModalTitle.textContent = 'Modifier le Projet';
+
+        // Remplissage du formulaire
+        document.getElementById('projectId').value = projectId;
+        document.getElementById('projectName').value = projectName;
+        document.getElementById('colorScheme').value = colorScheme;
+
+        // Affichage du bouton de suppression et mise à jour du bouton de soumission
+        this.elements.deleteProjectBtn.style.display = 'block';
+        this.elements.submitProjectBtn.textContent = 'Modifier';
+
+        modal.classList.add('show');
+    },
+
+    async handleProjectSubmit(e) {
+        e.preventDefault();
+        const formData = new FormData(this.elements.projectForm);
+        const projectId = document.getElementById('projectId').value;
+        const method = projectId ? 'PUT' : 'POST';
+        const url = projectId ? `/project/api/projects/${projectId}` : '/project/api/projects';
+
         try {
-            const response = await fetch('/project/api/projects', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+            const response = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(Object.fromEntries(formData))
             });
-            
-            const data = await response.json();
-            
-            if (response.ok) {
-                // Recharger la page pour afficher le nouveau projet
-                window.location.reload();
-            } else {
-                alert(data.error || 'Erreur lors de la création du projet');
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Erreur lors de l\'opération sur le projet');
             }
+
+            window.location.reload();
         } catch (error) {
             console.error('Error:', error);
-            alert('Erreur lors de la création du projet');
+            alert(error.message);
         }
-    });
-    
-    // Soumission du formulaire de tâche
-    taskForm.addEventListener('submit', async (e) => {
+    },
+
+    async handleProjectDelete() {
+        const projectId = document.getElementById('projectId').value;
+        const projectName = document.getElementById('projectName').value;
+
+        if (confirm(`Êtes-vous sûr de vouloir supprimer le projet "${projectName}" ?\nCette action supprimera également toutes les tâches associées.`)) {
+            try {
+                const response = await fetch(`/project/api/projects/${projectId}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Erreur lors de la suppression du projet');
+                }
+
+                window.location.reload();
+            } catch (error) {
+                console.error('Error:', error);
+                alert(error.message);
+            }
+        }
+    },
+
+    initializeDateInputs() {
+        const dateInputs = document.querySelectorAll('input[type="date"]');
+        const today = new Date().toISOString().split('T')[0];
+        
+        dateInputs.forEach(input => {
+            input.min = today;
+            
+            // Pour les inputs de date de fin, mettre à jour le min quand la date de début change
+            if (input.id.includes('End')) {
+                const startInput = document.getElementById(input.id.replace('End', 'Start'));
+                if (startInput) {
+                    startInput.addEventListener('change', () => {
+                        input.min = startInput.value;
+                        if (input.value && input.value < startInput.value) {
+                            input.value = startInput.value;
+                        }
+                    });
+                }
+            }
+        });
+    },
+
+    openNewTaskModal() {
+        const modal = this.elements.newTaskModal;
+        if (!modal) return;
+
+        this.elements.taskForm.reset();
+        this.updateProjectSelect();
+        modal.classList.add('show');
+    },
+
+    openEditTaskModal(taskData) {
+        const modal = this.elements.editTaskModal;
+        if (!modal) return;
+
+        // Remplir le formulaire avec les données de la tâche
+        document.getElementById('editTaskId').value = taskData.id;
+        document.getElementById('editTaskProject').value = taskData.projectId;
+        document.getElementById('editTaskText').value = taskData.text;
+        document.getElementById('editTaskStartDate').value = taskData.startDate;
+        document.getElementById('editTaskEndDate').value = taskData.endDate;
+        document.getElementById('editTaskEtp').value = taskData.etp;
+
+        modal.classList.add('show');
+    },
+
+    async handleTaskSubmit(e) {
         e.preventDefault();
-        const formData = new FormData(taskForm);
-        const data = Object.fromEntries(formData);
+        const formData = new FormData(this.elements.taskForm);
         
         try {
-            console.log('Sending task data:', data);
             const response = await fetch('/project/api/tasks', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(data)
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(Object.fromEntries(formData))
             });
-            
-            const result = await response.json();
-            console.log('Server response:', result);
-            
-            if (response.ok) {
-                // Fermer le modal
-                document.getElementById('newTaskModal').classList.remove('show');
-                
-                // Recharger la page pour afficher la nouvelle tâche
-                window.location.reload();
-            } else {
-                alert(result.error || 'Erreur lors de la création de la tâche');
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            alert('Erreur lors de la création de la tâche');
-        }
-    });
-    
-    // Validation des dates
-    const startDateInput = document.getElementById('taskStartDate');
-    const endDateInput = document.getElementById('taskEndDate');
-    
-    startDateInput.addEventListener('change', () => {
-        endDateInput.min = startDateInput.value;
-        if (endDateInput.value && endDateInput.value < startDateInput.value) {
-            endDateInput.value = startDateInput.value;
-        }
-    });
-    
-    // Fonctions utilitaires
-    function openModal(modal) {
-        modal.classList.add('show');
-        // Réinitialiser le formulaire
-        const form = modal.querySelector('form');
-        if (form) form.reset();
-    }
-    
-    async function updateProjectSelect() {
-        const select = document.getElementById('taskProject');
-        select.innerHTML = '';
-        
-        try {
-            const response = await fetch('/project/api/projects');
-            const data = await response.json();
-            
-            if (response.ok) {
-                data.projects.forEach(project => {
-                    const option = document.createElement('option');
-                    option.value = project.id;
-                    option.textContent = project.name;
-                    select.appendChild(option);
-                });
-            }
-        } catch (error) {
-            console.error('Error:', error);
-        }
-    }
-    
-    // Fermer les modals si on clique en dehors
-    window.addEventListener('click', (e) => {
-        if (e.target.classList.contains('modal')) {
-            e.target.classList.remove('show');
-        }
-    });
-    
-    // Initialiser les dates min/max
-    const today = new Date().toISOString().split('T')[0];
-    startDateInput.min = today;
-    endDateInput.min = today;
-});
 
-
-
-
-
-
-
-
-
-
-
-
-
-document.addEventListener('DOMContentLoaded', function() {
-    const editTaskModal = document.getElementById('editTaskModal');
-    const editTaskForm = document.getElementById('editTaskForm');
-    const deleteTaskBtn = document.getElementById('deleteTaskBtn');
-    
-    // Gestionnaire de clic sur une tâche
-    document.querySelectorAll('.task').forEach(task => {
-        task.addEventListener('click', function(e) {
-            e.stopPropagation();
-            const taskId = this.dataset.taskId;
-            const projectId = this.closest('.timeline-row').dataset.projectId;
-            
-            // Remplir le formulaire avec les données de la tâche
-            document.getElementById('editTaskId').value = taskId;
-            document.getElementById('editTaskProject').value = projectId;
-            document.getElementById('editTaskText').value = this.dataset.taskInfo;
-            document.getElementById('editTaskStartDate').value = this.dataset.startDate;
-            document.getElementById('editTaskEndDate').value = this.dataset.endDate;
-            document.getElementById('editTaskEtp').value = this.dataset.etp;
-            
-            // Afficher le modal
-            editTaskModal.classList.add('show');
-        });
-    });
-    
-    // Gestionnaire de soumission du formulaire d'édition
-    editTaskForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        const formData = new FormData(this);
-        const data = Object.fromEntries(formData);
-        
-        try {
-            const response = await fetch(`/project/api/tasks/${data.task_id}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(data)
-            });
-            
-            if (response.ok) {
-                // Fermer le modal et recharger la page
-                editTaskModal.classList.remove('show');
-                window.location.reload();
-            } else {
+            if (!response.ok) {
                 const error = await response.json();
-                alert(error.error || 'Erreur lors de la modification de la tâche');
+                throw new Error(error.error || 'Erreur lors de la création de la tâche');
             }
+
+            window.location.reload();
         } catch (error) {
             console.error('Error:', error);
-            alert('Erreur lors de la modification de la tâche');
+            alert(error.message);
         }
-    });
-    
-    // Gestionnaire pour la suppression
-    deleteTaskBtn.addEventListener('click', async function() {
-        if (confirm('Êtes-vous sûr de vouloir supprimer cette tâche ?')) {
-            const taskId = document.getElementById('editTaskId').value;
-            
+    },
+
+    async handleEditTaskSubmit(e) {
+        e.preventDefault();
+        const formData = new FormData(this.elements.editTaskForm);
+        const taskId = formData.get('task_id');
+        
+        try {
+            const response = await fetch(`/project/api/tasks/${taskId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(Object.fromEntries(formData))
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Erreur lors de la modification de la tâche');
+            }
+
+            window.location.reload();
+        } catch (error) {
+            console.error('Error:', error);
+            alert(error.message);
+        }
+    },
+
+    async handleTaskDelete() {
+        const taskId = document.getElementById('editTaskId').value;
+        const taskText = document.getElementById('editTaskText').value;
+        
+        if (confirm(`Êtes-vous sûr de vouloir supprimer la tâche "${taskText}" ?`)) {
             try {
                 const response = await fetch(`/project/api/tasks/${taskId}`, {
                     method: 'DELETE'
                 });
-                
-                if (response.ok) {
-                    // Fermer le modal et recharger la page
-                    editTaskModal.classList.remove('show');
-                    window.location.reload();
-                } else {
+
+                if (!response.ok) {
                     const error = await response.json();
-                    alert(error.error || 'Erreur lors de la suppression de la tâche');
+                    throw new Error(error.error || 'Erreur lors de la suppression de la tâche');
                 }
+
+                window.location.reload();
             } catch (error) {
                 console.error('Error:', error);
-                alert('Erreur lors de la suppression de la tâche');
+                alert(error.message);
             }
         }
-    });
-    
-    // Fermeture du modal
-    editTaskModal.querySelectorAll('.close, .close-modal').forEach(element => {
-        element.addEventListener('click', () => {
-            editTaskModal.classList.remove('show');
+    },
+
+    async updateProjectSelect() {
+        try {
+            const response = await fetch('/project/api/projects');
+            if (!response.ok) throw new Error('Erreur lors de la récupération des projets');
+            
+            const data = await response.json();
+            
+            [this.elements.taskProjectSelect, this.elements.editTaskProjectSelect].forEach(select => {
+                if (select) {
+                    select.innerHTML = '';
+                    data.data.projects.forEach(project => {
+                        const option = document.createElement('option');
+                        option.value = project.id;
+                        option.textContent = project.name;
+                        select.appendChild(option);
+                    });
+                }
+            });
+        } catch (error) {
+            console.error('Error updating project selects:', error);
+            alert('Erreur lors de la mise à jour de la liste des projets');
+        }
+    },
+
+    closeAllModals() {
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.classList.remove('show');
         });
-    });
+    },
+
+    // ... Le reste du code pour la gestion des tâches reste inchangé
+};
+
+// Initialisation
+document.addEventListener('DOMContentLoaded', function() {
+    TimelineManager.init();
+    ModalManager.init();
 });

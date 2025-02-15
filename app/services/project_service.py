@@ -9,6 +9,7 @@ from app.services.etp_service import EtpService
 from sqlalchemy.exc import IntegrityError
 
 class ProjectService:
+    COLOR_INTENSITIES = ['600', '500', '400']
     @staticmethod
     def get_all_projects() -> List[Project]:
         return Project.query.all()
