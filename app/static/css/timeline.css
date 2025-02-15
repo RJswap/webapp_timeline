@@ -425,3 +425,44 @@ input:checked + .slider:before {
     margin-right: 8px;
     vertical-align: middle;
 }
+
+
+/* Modal edition */
+
+.btn-danger {
+    background-color: #dc2626;
+    color: white;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-danger:hover {
+    background-color: #b91c1c;
+}
+
+/* Style pour le modal d'édition */
+#editTaskModal .modal-content {
+    max-width: 600px;
+}
+
+#editTaskModal .form-group {
+    margin-bottom: 1rem;
+}
+
+#editTaskModal .modal-footer {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 1.5rem;
+}
+
+#editTaskModal .modal-footer .btn-danger {
+    margin-right: auto;
+}
+
+/* Style pour le projet désactivé */
+#editTaskProject:disabled {
+    background-color: #f3f4f6;
+    cursor: not-allowed;
+}

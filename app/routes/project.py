@@ -1,9 +1,10 @@
 from flask import redirect, url_for
 from flask import Blueprint, render_template, jsonify, request
 from app.services import ProjectService, EtpService
-from app.models import Project
+from app.models import Project, Task
 from app.constants import TimeConstants
 from datetime import datetime, date
+from app import db
 
 bp = Blueprint('project', __name__, url_prefix='/project')
 
@@ -121,5 +122,52 @@ def get_projects():
             'status': 'success',
             'projects': [{'id': p.id, 'name': p.name} for p in projects]
         })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+
+
+
+
+
+
+
+
+@bp.route('/api/tasks/<int:task_id>', methods=['PUT'])
+def update_task(task_id):
+    try:
+        data = request.json
+        task = Task.query.get(task_id)
+        
+        if not task:
+            return jsonify({'error': 'Tâche non trouvée'}), 404
+            
+        # Mise à jour des champs
+        task.text = data.get('text', task.text)
+        task.start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date()
+        task.end_date = datetime.strptime(data['end_date'], '%Y-%m-%d').date()
+        task.etp = float(data.get('etp', task.etp))
+        
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'task': task.to_dict()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/api/tasks/<int:task_id>', methods=['DELETE'])
+def delete_task(task_id):
+    try:
+        success = ProjectService.delete_task(task_id)
+        
+        if success:
+            return jsonify({'status': 'success'})
+        else:
+            return jsonify({'error': 'Tâche non trouvée'}), 404
+            
     except Exception as e:
         return jsonify({'error': str(e)}), 500

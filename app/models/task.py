@@ -49,11 +49,15 @@ class Task(db.Model):
         start, width = self._calculate_grid_position()
         return {
             'id': self.id,
-            'start': start,
-            'width': width,
-            'color': self.color,
+            'project_id': self.project_id,
             'text': self.text,
+            'start_date': self.start_date.strftime('%d/%m/%Y'),  # Format de date pour l'affichage
+            'end_date': self.end_date.strftime('%d/%m/%Y'),      # Format de date pour l'affichage
+            'dates': f"{self.start_date.strftime('%d/%m/%Y')} - {self.end_date.strftime('%d/%m/%Y')}", # Pour l'infobulle
+            'raw_start_date': self.start_date.isoformat(),  # Pour l'édition
+            'raw_end_date': self.end_date.isoformat(),      # Pour l'édition
+            'color': self.color,
             'etp': self.etp,
-            'start_date': self.start_date.isoformat(),
-            'end_date': self.end_date.isoformat()
+            'start': start,
+            'width': width
         }

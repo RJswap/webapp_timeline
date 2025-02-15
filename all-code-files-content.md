@@ -3,6 +3,7 @@
 from app import create_app, db
 from app.services.init_data import init_db_data
 import logging
+import os
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
@@ -10,145 +11,149 @@ logger = logging.getLogger(__name__)
 
 app = create_app()
 
+# Nom du fichier de la base de données
+DB_FILE = 'instance/project_manager.db'
+
 if __name__ == '__main__':
     with app.app_context():
         try:
-            logger.info("Dropping all tables...")
-            db.drop_all()
-            logger.info("Tables dropped successfully")
+            # Vérifie si la base de données existe déjà
+            db_exists = os.path.exists(DB_FILE)
             
-            logger.info("Creating all tables...")
-            db.create_all()
-            logger.info("Tables created successfully")
-            
-            logger.info("Initializing database with sample data...")
-            init_db_data()
-            logger.info("Sample data initialized successfully")
-            
+            if not db_exists:
+                logger.info("Base de données non trouvée, création initiale...")
+                db.create_all()
+                logger.info("Tables créées avec succès")
+                
+                logger.info("Initialisation avec les données de test...")
+                init_db_data()
+                logger.info("Données de test initialisées avec succès")
+            else:
+                logger.info("Base de données existante trouvée, conservation des données...")
+        
         except Exception as e:
-            logger.error(f"An error occurred: {str(e)}")
+            logger.error(f"Une erreur est survenue : {str(e)}")
             raise e
         
-    logger.info("Starting Flask application...")
+    logger.info("Démarrage de l'application Flask...")
     app.run(debug=True)
 ```
 
-### __init__.py
+### env.py
 ```py
-from .project import Project
-from .task import Task
-from .etp_entry import EtpEntry
+import logging
+from logging.config import fileConfig
 
-__all__ = ['Project', 'Task', 'EtpEntry']
-```
+from flask import current_app
 
-### task.py
-```py
-from app import db
-from datetime import datetime, date
+from alembic import context
 
-class Task(db.Model):
-    __tablename__ = 'tasks'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
-    text = db.Column(db.String(200), nullable=False)
-    start_date = db.Column(db.Date, nullable=False)
-    end_date = db.Column(db.Date, nullable=False)
-    color = db.Column(db.String(50), nullable=False)
-    etp = db.Column(db.Float, default=1.0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    def _calculate_grid_position(self):
-        """Calcule la position relative dans la grille."""
-        def get_quarter_position(d: date) -> float:
-            if d.year > 2025:
-                return 80.0
-            
-            quarter = (d.month - 1) // 3
-            base_position = quarter * 20.0
-            
-            month_in_quarter = (d.month - 1) % 3
-            days_in_quarter = 90
-            days_from_quarter_start = (month_in_quarter * 30) + (d.day - 1)
-            relative_position = (days_from_quarter_start / days_in_quarter) * 20.0
-            
-            return base_position + relative_position
-        
-        start_pos = get_quarter_position(self.start_date)
-        end_pos = get_quarter_position(self.end_date)
-        
-        if end_pos < start_pos:
-            end_pos = 100.0
-        
-        width = end_pos - start_pos
-        
-        if width < 15 and (self.end_date.month - self.start_date.month >= 1):
-            width = 15
-        elif width < 8:
-            width = 8
-        
-        return start_pos, width
-    
-    def to_dict(self):
-        start, width = self._calculate_grid_position()
-        return {
-            'id': self.id,
-            'start': start,
-            'width': width,
-            'color': self.color,
-            'text': self.text,
-            'etp': self.etp,
-            'start_date': self.start_date.isoformat(),
-            'end_date': self.end_date.isoformat()
-        }
+# this is the Alembic Config object, which provides
+# access to the values within the .ini file in use.
+config = context.config
 
-```
+# Interpret the config file for Python logging.
+# This line sets up loggers basically.
+fileConfig(config.config_file_name)
+logger = logging.getLogger('alembic.env')
 
-### project.py
-```py
-from app import db
-from datetime import datetime
 
-class Project(db.Model):
-    __tablename__ = 'projects'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Relations avec référence en string pour éviter l'import circulaire
-    tasks = db.relationship('Task', backref='project', lazy=True, cascade='all, delete-orphan')
-    etp_entries = db.relationship('EtpEntry', backref='project', lazy=True, cascade='all, delete-orphan')
-    
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'name': self.name,
-            'tasks': [task.to_dict() for task in self.tasks]
-        }
-```
+def get_engine():
+    try:
+        # this works with Flask-SQLAlchemy<3 and Alchemical
+        return current_app.extensions['migrate'].db.get_engine()
+    except (TypeError, AttributeError):
+        # this works with Flask-SQLAlchemy>=3
+        return current_app.extensions['migrate'].db.engine
 
-### etp_entry.py
-```py
-from app import db
-from datetime import datetime
 
-class EtpEntry(db.Model):
-    __tablename__ = 'etp_entries'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
-    period = db.Column(db.String(20), nullable=False)
-    etp_value = db.Column(db.Float, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    __table_args__ = (
-        db.UniqueConstraint('project_id', 'period', name='uix_project_period'),
+def get_engine_url():
+    try:
+        return get_engine().url.render_as_string(hide_password=False).replace(
+            '%', '%%')
+    except AttributeError:
+        return str(get_engine().url).replace('%', '%%')
+
+
+# add your model's MetaData object here
+# for 'autogenerate' support
+# from myapp import mymodel
+# target_metadata = mymodel.Base.metadata
+config.set_main_option('sqlalchemy.url', get_engine_url())
+target_db = current_app.extensions['migrate'].db
+
+# other values from the config, defined by the needs of env.py,
+# can be acquired:
+# my_important_option = config.get_main_option("my_important_option")
+# ... etc.
+
+
+def get_metadata():
+    if hasattr(target_db, 'metadatas'):
+        return target_db.metadatas[None]
+    return target_db.metadata
+
+
+def run_migrations_offline():
+    """Run migrations in 'offline' mode.
+
+    This configures the context with just a URL
+    and not an Engine, though an Engine is acceptable
+    here as well.  By skipping the Engine creation
+    we don't even need a DBAPI to be available.
+
+    Calls to context.execute() here emit the given string to the
+    script output.
+
+    """
+    url = config.get_main_option("sqlalchemy.url")
+    context.configure(
+        url=url, target_metadata=get_metadata(), literal_binds=True
     )
+
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+def run_migrations_online():
+    """Run migrations in 'online' mode.
+
+    In this scenario we need to create an Engine
+    and associate a connection with the context.
+
+    """
+
+    # this callback is used to prevent an auto-migration from being generated
+    # when there are no changes to the schema
+    # reference: http://alembic.zzzcomputing.com/en/latest/cookbook.html
+    def process_revision_directives(context, revision, directives):
+        if getattr(config.cmd_opts, 'autogenerate', False):
+            script = directives[0]
+            if script.upgrade_ops.is_empty():
+                directives[:] = []
+                logger.info('No changes in schema detected.')
+
+    conf_args = current_app.extensions['migrate'].configure_args
+    if conf_args.get("process_revision_directives") is None:
+        conf_args["process_revision_directives"] = process_revision_directives
+
+    connectable = get_engine()
+
+    with connectable.connect() as connection:
+        context.configure(
+            connection=connection,
+            target_metadata=get_metadata(),
+            **conf_args
+        )
+
+        with context.begin_transaction():
+            context.run_migrations()
+
+
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    run_migrations_online()
 
 ```
 
@@ -156,9 +161,11 @@ class EtpEntry(db.Model):
 ```py
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 from app.config import DevelopmentConfig
 
 db = SQLAlchemy()
+migrate_manager = Migrate()  # Renommé pour éviter le conflit
 
 def create_app(config_class=DevelopmentConfig):
     app = Flask(__name__)
@@ -167,14 +174,13 @@ def create_app(config_class=DevelopmentConfig):
     # Initialize database
     db.init_app(app)
     
+    # Initialize Flask-Migrate
+    migrate_manager.init_app(app, db)
+    
     # Register blueprints
     from app.routes import main, project
     app.register_blueprint(main)
     app.register_blueprint(project)
-    
-    # Create database tables
-    with app.app_context():
-        db.create_all()
     
     return app
 ```
@@ -216,347 +222,206 @@ def create_app(config_class=DevelopmentConfig):
 
 ```
 
-### timeline.css
-```css
-/* Variables globales */
-:root {
-    --sidebar-width: 200px;
-    --row-height: 3.5rem;
-    --task-height: calc(100% - 1rem);
-    --grid-columns: 5;
-}
+### timeline.html
+```html
+{% extends "base.html" %}
 
-/* Reset du conteneur principal */
-.main-content {
-    max-width: 100%;
-    margin: 0;
-    padding: 0;
-}
+{% block title %}Timeline - Project Manager{% endblock %}
 
-/* Conteneur de la timeline */
-.timeline-container {
-    background-color: white;
-    padding: 1rem;
-    width: 100%;
-}
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/timeline.css') }}">
+{% endblock %}
 
-/* En-tête de la page */
-.page-title {
-    padding: 0 2rem;
-    margin-bottom: 1rem;
-    font-size: 1.5rem;
-    font-weight: bold;
-    color: var(--primary-color);
-}
+{% block content %}
+    <div class="timeline-container">
+        <h1 class="page-title">Project Timeline</h1>
+        <div id="newProjectModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Nouveau Projet</h2>
+                    <span class="close">&times;</span>
+                </div>
+                <form id="newProjectForm">
+                    <div class="form-group">
+                        <label for="projectName">Nom du projet</label>
+                        <input type="text" id="projectName" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="colorScheme">Schéma de couleur</label>
+                        <select id="colorScheme" name="colorScheme" required>
+                            <option value="blue">Bleu</option>
+                            <option value="purple">Violet</option>
+                            <option value="green">Vert</option>
+                            <option value="yellow">Jaune</option>
+                            <option value="red">Rouge</option>
+                            <option value="indigo">Indigo</option>
+                            <option value="teal">Teal</option>
+                            <option value="gray">Gris</option>
+                        </select>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="submit" class="btn-primary">Créer</button>
+                        <button type="button" class="btn-secondary close-modal">Annuler</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Modal Nouvelle Tâche -->
+        <div id="newTaskModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Nouvelle Tâche</h2>
+                    <span class="close">&times;</span>
+                </div>
+                <form id="newTaskForm">
+                    <div class="form-group">
+                        <label for="taskProject">Projet</label>
+                        <select id="taskProject" name="project_id" required>
+                            <!-- Rempli dynamiquement -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="taskText">Description</label>
+                        <input type="text" id="taskText" name="text" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="taskStartDate">Date de début</label>
+                        <input type="date" id="taskStartDate" name="start_date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="taskEndDate">Date de fin</label>
+                        <input type="date" id="taskEndDate" name="end_date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="taskEtp">ETP</label>
+                        <input type="number" id="taskEtp" name="etp" step="0.1" min="0" value="1.0" required>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="submit" class="btn-primary">Créer</button>
+                        <button type="button" class="btn-secondary close-modal">Annuler</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Boutons d'action -->
+        <div class="action-buttons">
+            <button id="addProjectBtn" class="btn-primary">
+                <i class="fas fa-plus"></i> Nouveau Projet
+            </button>
+            <button id="addTaskBtn" class="btn-primary">
+                <i class="fas fa-plus"></i> Nouvelle Tâche
+            </button>
+        </div>
+        
+        <div class="timeline-grid">
+            <div class="timeline-main">
+                <div class="periods-grid">
+                    <div class="period"></div>
+                    {% for period in periods %}
+                    <div class="period">{{ period }}</div>
+                    {% endfor %}
+                </div>
 
-/* Toggles des streams */
-.stream-toggles {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
-    margin-bottom: 1rem;
-    padding: 1rem 2rem;
-    background-color: #f8fafc;
-    border-radius: 0.5rem;
-}
+                <div class="timeline-rows-container">
+                    {% for project in projects %}
+                    <div class="timeline-row" data-project-name="{{ project.name }}">
+                        <div class="project-name">{{ project.name }}</div>
+                        <div class="project-tasks">
+                            {% for task in project.tasks %}
+                            <div class="task bg-{{ task.color }}"
+                                style="left: {{ task.start }}%; width: {{ task.width }}%;"
+                                data-task-info="{{ task.text }}"
+                                data-dates="{{ task.start_date }} - {{ task.end_date }}">
+                                {{ task.text }}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
 
-.stream-toggle {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    cursor: pointer;
-}
-
-/* Style du switch */
-.switch {
-    position: relative;
-    display: inline-block;
-    width: 48px;
-    height: 24px;
-}
-
-.switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
-
-.slider {
-    position: absolute;
-    cursor: pointer;
-    inset: 0;
-    background-color: #e5e7eb;
-    transition: .3s;
-    border-radius: 24px;
-}
-
-.slider:before {
-    content: "";
-    position: absolute;
-    height: 18px;
-    width: 18px;
-    left: 3px;
-    bottom: 3px;
-    background-color: white;
-    transition: .3s;
-    border-radius: 50%;
-}
-
-input:checked + .slider {
-    background-color: var(--primary-color);
-}
-
-input:checked + .slider:before {
-    transform: translateX(24px);
-}
-
-/* Structure principale de la timeline */
-.timeline-grid {
-    width: 100%;
-    overflow-x: auto;
-}
-
-.timeline-main {
-    width: 100%;
-    min-width: 100%;
-    padding: 0 1rem;
-}
-
-.period {
-    padding: 0.5rem;
-    text-align: center;
-    border-right: 1px solid rgba(255, 255, 255, 0.2);
-    font-size: 0.875rem;
-}
-
-/* Grille des périodes */
-.periods-grid {
-    display: grid; 
-    grid-template-columns: var(--sidebar-width) repeat(var(--grid-columns), 1fr);
-    background-color: var(--primary-color);
-    gap: 0;
-    color: white;
-    border-radius: 0.25rem;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-}
-
-
-
-/* Conteneur des lignes */
-.timeline-rows-container {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    margin-top: 1rem;
-}
-
-/* Ligne de projet */
-.timeline-row {
-    display: grid;
-    grid-template-columns: var(--sidebar-width) 1fr;
-    min-height: var(--row-height);
-    margin-bottom: 0.5rem;
-}
-
-/* Nom du projet */
-.project-name {
-    font-weight: 600;
-    padding: 0.5rem 1rem;
-    background-color: #f9fafb;
-    border-radius: 0.25rem 0 0 0.25rem;
-    display: flex;
-    align-items: center;
-}
-
-/* Conteneur des tâches */
-.project-tasks {
-    position: relative;
-    background-color: #f9fafb;
-    border-radius: 0 0.25rem 0.25rem 0;
-    padding: 0.5rem;
-    min-height: var(--row-height);
-    width: 100%;
-}
-
-/* Style des lignes de la grille */
-.project-tasks::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background-image: linear-gradient(
-        to right,
-        rgba(0, 0, 0, 0.1) 1px,
-        transparent 1px
-    );
-    background-size: calc(100% / var(--grid-columns)) 100%;
-    pointer-events: none;
-    z-index: 0;
-}
-
-/* Style des tâches */
-.task {
-    position: absolute;
-    max-width: 100%; /* Cela pourrait limiter la largeur */
-    height: var(--task-height);
-    padding: 0.5rem;
-    border-radius: 0.25rem;
-    font-size: 0.75rem;
-    color: white;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    transition: transform 0.2s, box-shadow 0.2s;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    z-index: 1;
-}
-
-.task:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    z-index: 2;
-}
-
-.task:hover::after {
-    content: attr(data-dates);
-    position: absolute;
-    bottom: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.8);
-    color: white;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.25rem;
-    font-size: 0.75rem;
-    white-space: nowrap;
-    z-index: 1000;
-}
-
-/* Styles des jalons */
-.milestones {
-    margin-top: 2rem;
-}
-
-.milestone-container {
-    position: relative;
-    height: 4rem;
-    background-color: #f9fafb;
-    border-radius: 0.25rem;
-    padding: 1rem;
-}
-
-.milestone {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-}
-
-.milestone-dot {
-    width: 1rem;
-    height: 1rem;
-    background-color: var(--secondary-color);
-    border-radius: 50%;
-    margin: 0 auto;
-}
-
-.milestone-text {
-    position: absolute;
-    width: max-content;
-    left: 50%;
-    transform: translateX(-50%);
-    margin-top: 0.5rem;
-    font-size: 0.75rem;
-    font-weight: 500;
-}
-
-/* Animation pour masquer/afficher les lignes */
-.timeline-row {
-    transition: all 0.3s ease;
-}
-
-.timeline-row.hidden {
-    display: none;
-}
-
-/* Couleurs des tâches */
-.bg-blue-600 { background-color: #2563eb; }
-.bg-blue-500 { background-color: #3b82f6; }
-.bg-purple-600 { background-color: #9333ea; }
-.bg-purple-500 { background-color: #a855f7; }
-.bg-purple-400 { background-color: #c084fc; }
-.bg-green-600 { background-color: #16a34a; }
-.bg-green-500 { background-color: #22c55e; }
-.bg-green-400 { background-color: #4ade80; }
-.bg-yellow-600 { background-color: #ca8a04; }
-.bg-red-600 { background-color: #dc2626; }
-.bg-red-500 { background-color: #ef4444; }
-.bg-indigo-600 { background-color: #4f46e5; }
-.bg-indigo-500 { background-color: #6366f1; }
-.bg-teal-600 { background-color: #0d9488; }
-.bg-teal-500 { background-color: #14b8a6; }
-.bg-gray-600 { background-color: #4b5563; }
-.bg-gray-500 { background-color: #6b7280; }
-
-/* Responsive */
-@media (max-width: 1024px) {
-    :root {
-        --sidebar-width: 150px;
-    }
-    
-    .project-name {
-        font-size: 0.875rem;
-    }
-    
-    .task {
-        font-size: 0.75rem;
-    }
-}
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/project/timeline.js') }}"></script>
+{% endblock %}
 ```
 
-### normalize.css
-```css
-/* Modern CSS Reset */
-*,
-*::before,
-*::after {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-}
+### etp_table.html
+```html
+{% extends "base.html" %}
 
-/* Basic resets and defaults */
-body {
-    line-height: 1.5;
-    -webkit-font-smoothing: antialiased;
-}
+{% block title %}ETP Table - Project Manager{% endblock %}
 
-img,
-picture,
-video,
-canvas,
-svg {
-    display: block;
-    max-width: 100%;
-}
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/project/etp_table.css') }}">
+{% endblock %}
 
-input,
-button,
-textarea,
-select {
-    font: inherit;
-}
+{% block content %}
+<div class="etp-container">
+    <h1 class="page-title">Resource Allocation (ETP)</h1>
+    
+    <div class="etp-table-container">
+        <table class="etp-table">
+            <thead>
+                <tr>
+                    <th>Stream</th>
+                    <th>2025 Q1-Q2</th>
+                    <th>2025 Q3-Q4</th>
+                    <th>2026-2027</th>
+                    <th>ETP Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in etp_data %}
+                <tr data-project="{{ row.name }}">
+                    <td>{{ row.name }}</td>
+                    <td class="text-center editable-cell" data-period="2025 Q1-Q2">
+                        <span class="etp-value">{{ "%.2f"|format(row["2025 Q1-Q2"]) }}</span>
+                    </td>
+                    <td class="text-center editable-cell" data-period="2025 Q3-Q4">
+                        <span class="etp-value">{{ "%.2f"|format(row["2025 Q3-Q4"]) }}</span>
+                    </td>
+                    <td class="text-center editable-cell" data-period="2026-2027">
+                        <span class="etp-value">{{ "%.2f"|format(row["2026-2027"]) }}</span>
+                    </td>
+                    <td class="text-center row-total">{{ "%.2f"|format(row.total) }}</td>
+                </tr>
+                {% endfor %}
+                <tr class="total-row">
+                    <td class="bold">Total ETP by period</td>
+                    <td class="text-center period-total" data-period="2025 Q1-Q2">
+                        {{ "%.2f"|format(period_totals["2025 Q1-Q2"]) }}
+                    </td>
+                    <td class="text-center period-total" data-period="2025 Q3-Q4">
+                        {{ "%.2f"|format(period_totals["2025 Q3-Q4"]) }}
+                    </td>
+                    <td class="text-center period-total" data-period="2026-2027">
+                        {{ "%.2f"|format(period_totals["2026-2027"]) }}
+                    </td>
+                    <td class="text-center grand-total">{{ "%.2f"|format(total_max_etp) }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
 
-p,
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-    overflow-wrap: break-word;
-}
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/project/etp_table.js') }}"></script>
+{% endblock %}
+```
+
+### __init__.py
+```py
+from .project_service import ProjectService
+from .etp_service import EtpService
+
+__all__ = ['ProjectService', 'EtpService']
 ```
 
 ### etp_table.css
@@ -753,476 +618,6 @@ body {
 
 ```
 
-### base.js
-```js
-// base.js - Fonctionnalités communes à toute l'application
-
-document.addEventListener('DOMContentLoaded', function() {
-    // Configuration des variables globales
-    window.APP = {
-        config: {
-            animationDuration: 300,
-            dateFormat: 'DD/MM/YYYY',
-            apiEndpoint: '/api'
-        }
-    };
-
-    // Gestion de la navigation active
-    const handleActiveNavigation = () => {
-        const currentPath = window.location.pathname;
-        document.querySelectorAll('.nav-links a').forEach(link => {
-            if (link.getAttribute('href') === currentPath) {
-                link.classList.add('active');
-            }
-        });
-    };
-
-    // Gestion des notifications
-    const notifications = {
-        container: null,
-        
-        init() {
-            this.container = document.createElement('div');
-            this.container.className = 'notifications-container';
-            document.body.appendChild(this.container);
-        },
-
-        show(message, type = 'info') {
-            const notification = document.createElement('div');
-            notification.className = `notification notification-${type}`;
-            notification.textContent = message;
-            
-            this.container.appendChild(notification);
-            
-            // Animation d'entrée
-            setTimeout(() => {
-                notification.classList.add('show');
-            }, 10);
-
-            // Auto-suppression après 5 secondes
-            setTimeout(() => {
-                notification.classList.remove('show');
-                setTimeout(() => {
-                    notification.remove();
-                }, 300);
-            }, 5000);
-        }
-    };
-
-    // Gestion du thème
-    const themeManager = {
-        init() {
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            this.setTheme(savedTheme);
-            
-            // Écouteur pour le bouton de changement de thème (si présent)
-            const themeToggle = document.querySelector('.theme-toggle');
-            if (themeToggle) {
-                themeToggle.addEventListener('click', () => {
-                    const newTheme = document.body.classList.contains('dark-theme') ? 'light' : 'dark';
-                    this.setTheme(newTheme);
-                });
-            }
-        },
-
-        setTheme(theme) {
-            document.body.classList.remove('light-theme', 'dark-theme');
-            document.body.classList.add(`${theme}-theme`);
-            localStorage.setItem('theme', theme);
-        }
-    };
-
-    // Utilitaires pour les dates
-    const dateUtils = {
-        formatDate(date) {
-            return new Intl.DateTimeFormat('fr-FR').format(date);
-        },
-
-        formatDateTime(date) {
-            return new Intl.DateTimeFormat('fr-FR', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit'
-            }).format(date);
-        }
-    };
-
-    // Gestion des formulaires
-    const formManager = {
-        init() {
-            document.querySelectorAll('form').forEach(form => {
-                form.addEventListener('submit', this.handleSubmit.bind(this));
-            });
-        },
-
-        handleSubmit(event) {
-            const form = event.target;
-            
-            // Désactiver le bouton submit pendant le traitement
-            const submitButton = form.querySelector('[type="submit"]');
-            if (submitButton) {
-                submitButton.disabled = true;
-            }
-
-            // Réactiver le bouton après le traitement
-            setTimeout(() => {
-                if (submitButton) {
-                    submitButton.disabled = false;
-                }
-            }, 1000);
-        },
-
-        validateForm(form) {
-            let isValid = true;
-            const inputs = form.querySelectorAll('input[required], select[required], textarea[required]');
-            
-            inputs.forEach(input => {
-                if (!input.value.trim()) {
-                    isValid = false;
-                    this.showError(input, 'Ce champ est requis');
-                } else {
-                    this.clearError(input);
-                }
-            });
-
-            return isValid;
-        },
-
-        showError(input, message) {
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'form-error';
-            errorDiv.textContent = message;
-            input.classList.add('error');
-            input.parentNode.appendChild(errorDiv);
-        },
-
-        clearError(input) {
-            input.classList.remove('error');
-            const errorDiv = input.parentNode.querySelector('.form-error');
-            if (errorDiv) {
-                errorDiv.remove();
-            }
-        }
-    };
-
-    // Gestion des erreurs globales
-    //window.onerror = function(msg, url, lineNo, columnNo, error) {
-        //console.error('Error: ', msg, url, lineNo, columnNo, error);
-        //notifications.show('Une erreur est survenue', 'error');
-        //return false;
-    //};
-
-    // Initialisation des composants
-    const init = () => {
-        handleActiveNavigation();
-        notifications.init();
-        themeManager.init();
-        formManager.init();
-        
-        // Exposer les utilitaires globalement
-        window.APP = {
-            ...window.APP,
-            notifications,
-            dateUtils,
-            formManager
-        };
-    };
-
-    // Lancer l'initialisation
-    init();
-});
-```
-
-### constants.py
-```py
-class TimeConstants:
-    PERIODS_MAPPING = {
-        1: "2025 Q1-Q2",
-        2: "2025 Q3-Q4",
-        3: "2026-2027"
-    }
-    
-    PERIODS_DISPLAY = [
-        "2025 Q1",
-        "2025 Q2",
-        "2025 Q3",
-        "2025 Q4",
-        "2026-2027"
-    ]
-    
-    MILESTONES = [
-        {"position": "left-1/3", "text": "RFI"},
-        {"position": "left-1/2", "text": "RFP"},
-        {"position": "left-2/3", "text": "Pilot"},
-        {"position": "right-1/6", "text": "Déploiement"}
-    ]
-```
-
-### config.py
-```py
-from datetime import timedelta
-
-class Config:
-    SECRET_KEY = 'your-secret-key-here'
-    DEBUG = False
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///project_manager.db'
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
-
-class DevelopmentConfig(Config):
-    DEBUG = True
-
-class ProductionConfig(Config):
-    DEBUG = False
-```
-
-### timeline.js
-```js
-// static/js/project/timeline.js
-
-document.addEventListener('DOMContentLoaded', function() {
-    const timelineRows = document.querySelectorAll('.timeline-row');
-    
-    // Créer la barre de toggles
-    const streamToggles = document.createElement('div');
-    streamToggles.className = 'stream-toggles';
-    
-    // Créer un toggle pour chaque projet
-    timelineRows.forEach((row) => {
-        const projectName = row.dataset.projectName;
-        const toggleWrapper = document.createElement('div');
-        toggleWrapper.className = 'stream-toggle';
-        
-        // Créer le switch
-        const label = document.createElement('label');
-        label.className = 'switch';
-        
-        const input = document.createElement('input');
-        input.type = 'checkbox';
-        input.checked = true;
-        
-        const slider = document.createElement('span');
-        slider.className = 'slider';
-        
-        label.appendChild(input);
-        label.appendChild(slider);
-        
-        // Ajouter le label du projet
-        const nameLabel = document.createElement('span');
-        nameLabel.textContent = projectName;
-        
-        toggleWrapper.appendChild(label);
-        toggleWrapper.appendChild(nameLabel);
-        streamToggles.appendChild(toggleWrapper);
-        
-        // Gestionnaire d'événements pour le toggle
-        input.addEventListener('change', function() {
-            const isVisible = this.checked;
-            toggleRowVisibility(row, isVisible);
-            updatePositions();
-        });
-    });
-    
-    // Insérer la barre de toggles avant la timeline
-    const timelineContainer = document.querySelector('.timeline-container');
-    timelineContainer.insertBefore(streamToggles, timelineContainer.querySelector('.timeline-grid'));
-    
-    function toggleRowVisibility(row, isVisible) {
-        if (isVisible) {
-            row.classList.remove('hidden');
-            row.style.height = '';
-            row.style.opacity = '1';
-        } else {
-            row.classList.add('hidden');
-            row.style.height = '0';
-            row.style.opacity = '0';
-        }
-    }
-    
-    function updatePositions() {
-        let currentOffset = 0;
-        timelineRows.forEach(row => {
-            if (!row.classList.contains('hidden')) {
-                currentOffset += row.offsetHeight + 16; // 16px pour le gap
-            }
-        });
-    }
-
-    document.querySelectorAll('.task').forEach(task => {
-        const left = task.style.left;
-        const width = task.style.width;
-        
-        console.log(`Task: ${task.textContent.trim()}`);
-        console.log(`Position CSS - left: ${left}, width: ${width}`);
-        console.log(`Container width: ${task.parentElement.offsetWidth}px`);
-        console.log('---');
-        
-        // Valider visuellement les positions
-        task.title = `Position: ${left} | Width: ${width}`;
-    });
-    
-});
-```
-
-### etp_table.js
-```js
-// static/js/project/etp_table.js
-
-document.addEventListener('DOMContentLoaded', function() {
-    const table = document.querySelector('.etp-table');
-    let activeInput = null;
-
-    // Gérer le clic sur une cellule éditable
-    document.addEventListener('click', function(e) {
-        const cell = e.target.closest('.editable-cell');
-        if (!cell) return;
-        if (cell.querySelector('input')) return;
-
-        const valueSpan = cell.querySelector('.etp-value');
-        const currentValue = valueSpan.textContent.trim();
-
-        const input = document.createElement('input');
-        input.type = 'number';
-        input.step = '0.1';
-        input.min = '0';
-        input.value = currentValue;
-        input.className = 'etp-input';
-
-        valueSpan.style.display = 'none';
-        cell.appendChild(input);
-        input.focus();
-        activeInput = input;
-
-        input.select();
-    });
-
-    // Gérer la validation des modifications
-    async function saveChange(cell, newValue) {
-        const project = cell.closest('tr').dataset.project;
-        const period = cell.dataset.period;
-
-        try {
-            const response = await fetch('/project/api/update_etp', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    project,
-                    period,
-                    etp: newValue
-                })
-            });
-
-            if (!response.ok) throw new Error('Failed to update ETP');
-
-            const valueSpan = cell.querySelector('.etp-value');
-            valueSpan.textContent = parseFloat(newValue).toFixed(2);
-            valueSpan.style.display = '';
-            valueSpan.classList.add('updated');
-            
-            if (cell.querySelector('input')) {
-                cell.querySelector('input').remove();
-            }
-
-            updateTotals();
-            
-        } catch (error) {
-            console.error('Error updating ETP:', error);
-            alert('Failed to update ETP');
-        }
-    }
-
-    // Gérer les touches clavier pendant l'édition
-    document.addEventListener('keydown', function(e) {
-        if (!activeInput) return;
-        
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            const newValue = activeInput.value;
-            if (newValue && !isNaN(newValue)) {
-                const cell = activeInput.closest('.editable-cell');
-                saveChange(cell, newValue);
-            }
-            activeInput = null;
-        } else if (e.key === 'Escape') {
-            const cell = activeInput.closest('.editable-cell');
-            cell.querySelector('.etp-value').style.display = '';
-            activeInput.remove();
-            activeInput = null;
-        }
-    });
-
-    // Gérer la perte de focus
-    document.addEventListener('click', function(e) {
-        if (activeInput && !activeInput.contains(e.target) && !e.target.closest('.editable-cell')) {
-            const newValue = activeInput.value;
-            if (newValue && !isNaN(newValue)) {
-                const cell = activeInput.closest('.editable-cell');
-                saveChange(cell, newValue);
-            }
-            activeInput = null;
-        }
-    });
-
-    // Fonction pour mettre à jour tous les totaux
-    function updateTotals() {
-        // Totaux par période
-        const periods = ['2025 Q1-Q2', '2025 Q3-Q4', '2026-2027'];
-        
-        periods.forEach(period => {
-            const cells = table.querySelectorAll(`td[data-period="${period}"] .etp-value`);
-            const total = Array.from(cells)
-                .reduce((sum, cell) => sum + parseFloat(cell.textContent || 0), 0);
-            const totalCell = table.querySelector(`.period-total[data-period="${period}"]`);
-            if (totalCell) {
-                totalCell.textContent = total.toFixed(2);
-                totalCell.classList.add('updated');
-            }
-        });
-
-        // Totaux par ligne (max ETP)
-        const projectRows = table.querySelectorAll('tr[data-project]');
-        projectRows.forEach(row => {
-            const etpCells = row.querySelectorAll('.etp-value');
-            const maxEtp = Array.from(etpCells)
-                .reduce((max, cell) => Math.max(max, parseFloat(cell.textContent || 0)), 0);
-            const totalCell = row.querySelector('.row-total');
-            if (totalCell) {
-                totalCell.textContent = maxEtp.toFixed(2);
-                totalCell.classList.add('updated');
-            }
-        });
-
-        // Total général (somme des max ETP)
-        const rowTotals = Array.from(table.querySelectorAll('.row-total'))
-            .map(cell => parseFloat(cell.textContent || 0));
-        const grandTotal = rowTotals.reduce((sum, val) => sum + val, 0);
-        const grandTotalCell = table.querySelector('.grand-total');
-        if (grandTotalCell) {
-            grandTotalCell.textContent = grandTotal.toFixed(2);
-            grandTotalCell.classList.add('updated');
-        }
-
-        // Retirer les classes 'updated' après l'animation
-        setTimeout(() => {
-            table.querySelectorAll('.updated').forEach(el => {
-                el.classList.remove('updated');
-            });
-        }, 1000);
-    }
-});
-```
-
-### __init__.py
-```py
-from .project_service import ProjectService
-from .etp_service import EtpService
-
-__all__ = ['ProjectService', 'EtpService']
-```
-
 ### project_service.py
 ```py
 from typing import List, Optional
@@ -1249,8 +644,8 @@ class ProjectService:
         return Project.query.filter_by(name=name).first()
     
     @staticmethod
-    def create_project(name: str) -> Project:
-        project = Project(name=name)
+    def create_project(name: str, color_scheme: str = 'blue') -> Project:
+        project = Project(name=name, color_scheme=color_scheme)
         db.session.add(project)
         try:
             db.session.commit()
@@ -1267,45 +662,46 @@ class ProjectService:
         end_date: date,
         color: str,
         etp: float = 1.0
-    ) -> Task:
-        task = Task(
-            project_id=project_id,
-            text=text,
-            start_date=start_date,
-            end_date=end_date,
-            color=color,
-            etp=etp
-        )
-        db.session.add(task)
-        db.session.commit()
-        return task
-    
-    @staticmethod
-    def update_task(
-        task_id: int,
-        text: Optional[str] = None,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
-        color: Optional[str] = None,
-        etp: Optional[float] = None
     ) -> Optional[Task]:
-        task = Task.query.get(task_id)
-        if not task:
-            return None
+        try:
+            # Récupérer le projet pour obtenir son schéma de couleur
+            project = Project.query.get(project_id)
+            if not project:
+                raise ValueError("Project not found")
+
+            # Si aucune couleur n'est spécifiée, utiliser le schéma de couleur du projet
+            if color is None:
+                # Déterminer l'intensité en fonction du nombre de tâches existantes
+                intensities = ['600', '500', '400']
+                intensity = intensities[len(project.tasks) % len(intensities)]
+                color = f"{project.color_scheme}-{intensity}"
+
+            print(f"Creating task in service: {project_id}, {text}, {start_date}-{end_date}, {color}")
+            task = Task(
+                project_id=project_id,
+                text=text,
+                start_date=start_date,
+                end_date=end_date,
+                color=color,
+                etp=etp
+            )
             
-        if text is not None:
-            task.text = text
-        if start_date is not None:
-            task.start_date = start_date
-        if end_date is not None:
-            task.end_date = end_date
-        if color is not None:
-            task.color = color
-        if etp is not None:
-            task.etp = etp
+            db.session.add(task)
+            db.session.commit()
             
-        db.session.commit()
-        return task
+            # Vérifier que la tâche a bien été créée
+            created_task = Task.query.get(task.id)
+            if created_task:
+                print(f"Task created successfully with ID: {created_task.id}")
+                return created_task
+            else:
+                print("Task was not created properly")
+                return None
+                
+        except Exception as e:
+            print(f"Error in create_task: {str(e)}")
+            db.session.rollback()
+            raise
     
     @staticmethod
     def delete_task(task_id: int) -> bool:
@@ -1637,12 +1033,746 @@ class EtpService:
         db.session.commit()
 ```
 
+### timeline.js
+```js
+// static/js/project/timeline.js
+
+document.addEventListener('DOMContentLoaded', function() {
+    const timelineRows = document.querySelectorAll('.timeline-row');
+    
+    // Créer la barre de toggles
+    const streamToggles = document.createElement('div');
+    streamToggles.className = 'stream-toggles';
+    
+    // Créer un toggle pour chaque projet
+    timelineRows.forEach((row) => {
+        const projectName = row.dataset.projectName;
+        const toggleWrapper = document.createElement('div');
+        toggleWrapper.className = 'stream-toggle';
+        
+        // Créer le switch
+        const label = document.createElement('label');
+        label.className = 'switch';
+        
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.checked = true;
+        
+        const slider = document.createElement('span');
+        slider.className = 'slider';
+        
+        label.appendChild(input);
+        label.appendChild(slider);
+        
+        // Ajouter le label du projet
+        const nameLabel = document.createElement('span');
+        nameLabel.textContent = projectName;
+        
+        toggleWrapper.appendChild(label);
+        toggleWrapper.appendChild(nameLabel);
+        streamToggles.appendChild(toggleWrapper);
+        
+        // Gestionnaire d'événements pour le toggle
+        input.addEventListener('change', function() {
+            const isVisible = this.checked;
+            toggleRowVisibility(row, isVisible);
+            updatePositions();
+        });
+    });
+    
+    // Insérer la barre de toggles avant la timeline
+    const timelineContainer = document.querySelector('.timeline-container');
+    timelineContainer.insertBefore(streamToggles, timelineContainer.querySelector('.timeline-grid'));
+    
+    function toggleRowVisibility(row, isVisible) {
+        if (isVisible) {
+            row.classList.remove('hidden');
+            row.style.height = '';
+            row.style.opacity = '1';
+        } else {
+            row.classList.add('hidden');
+            row.style.height = '0';
+            row.style.opacity = '0';
+        }
+    }
+    
+    function updatePositions() {
+        let currentOffset = 0;
+        timelineRows.forEach(row => {
+            if (!row.classList.contains('hidden')) {
+                currentOffset += row.offsetHeight + 16; // 16px pour le gap
+            }
+        });
+    }
+
+    document.querySelectorAll('.task').forEach(task => {
+        const left = task.style.left;
+        const width = task.style.width;
+        
+        console.log(`Task: ${task.textContent.trim()}`);
+        console.log(`Position CSS - left: ${left}, width: ${width}`);
+        console.log(`Container width: ${task.parentElement.offsetWidth}px`);
+        console.log('---');
+        
+        // Valider visuellement les positions
+        task.title = `Position: ${left} | Width: ${width}`;
+    });
+    
+});
+
+
+
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Éléments du DOM
+    const newProjectModal = document.getElementById('newProjectModal');
+    const newTaskModal = document.getElementById('newTaskModal');
+    const addProjectBtn = document.getElementById('addProjectBtn');
+    const addTaskBtn = document.getElementById('addTaskBtn');
+    const projectForm = document.getElementById('newProjectForm');
+    const taskForm = document.getElementById('newTaskForm');
+    
+    // Gestionnaires d'ouverture des modals
+    addProjectBtn.addEventListener('click', () => openModal(newProjectModal));
+    addTaskBtn.addEventListener('click', async () => {
+        await updateProjectSelect();
+        openModal(newTaskModal);
+    });
+    
+    // Fermeture des modals
+    document.querySelectorAll('.close, .close-modal').forEach(element => {
+        element.addEventListener('click', () => {
+            newProjectModal.classList.remove('show');
+            newTaskModal.classList.remove('show');
+        });
+    });
+    
+    // Soumission du formulaire de projet
+    projectForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(projectForm);
+        
+        try {
+            const response = await fetch('/project/api/projects', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(Object.fromEntries(formData))
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                // Recharger la page pour afficher le nouveau projet
+                window.location.reload();
+            } else {
+                alert(data.error || 'Erreur lors de la création du projet');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Erreur lors de la création du projet');
+        }
+    });
+    
+    // Soumission du formulaire de tâche
+    taskForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(taskForm);
+        const data = Object.fromEntries(formData);
+        
+        try {
+            console.log('Sending task data:', data);
+            const response = await fetch('/project/api/tasks', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            });
+            
+            const result = await response.json();
+            console.log('Server response:', result);
+            
+            if (response.ok) {
+                // Fermer le modal
+                document.getElementById('newTaskModal').classList.remove('show');
+                
+                // Recharger la page pour afficher la nouvelle tâche
+                window.location.reload();
+            } else {
+                alert(result.error || 'Erreur lors de la création de la tâche');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Erreur lors de la création de la tâche');
+        }
+    });
+    
+    // Validation des dates
+    const startDateInput = document.getElementById('taskStartDate');
+    const endDateInput = document.getElementById('taskEndDate');
+    
+    startDateInput.addEventListener('change', () => {
+        endDateInput.min = startDateInput.value;
+        if (endDateInput.value && endDateInput.value < startDateInput.value) {
+            endDateInput.value = startDateInput.value;
+        }
+    });
+    
+    // Fonctions utilitaires
+    function openModal(modal) {
+        modal.classList.add('show');
+        // Réinitialiser le formulaire
+        const form = modal.querySelector('form');
+        if (form) form.reset();
+    }
+    
+    async function updateProjectSelect() {
+        const select = document.getElementById('taskProject');
+        select.innerHTML = '';
+        
+        try {
+            const response = await fetch('/project/api/projects');
+            const data = await response.json();
+            
+            if (response.ok) {
+                data.projects.forEach(project => {
+                    const option = document.createElement('option');
+                    option.value = project.id;
+                    option.textContent = project.name;
+                    select.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    }
+    
+    // Fermer les modals si on clique en dehors
+    window.addEventListener('click', (e) => {
+        if (e.target.classList.contains('modal')) {
+            e.target.classList.remove('show');
+        }
+    });
+    
+    // Initialiser les dates min/max
+    const today = new Date().toISOString().split('T')[0];
+    startDateInput.min = today;
+    endDateInput.min = today;
+});
+```
+
+### task.py
+```py
+from app import db
+from datetime import datetime, date
+
+class Task(db.Model):
+    __tablename__ = 'tasks'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
+    text = db.Column(db.String(200), nullable=False)
+    start_date = db.Column(db.Date, nullable=False)
+    end_date = db.Column(db.Date, nullable=False)
+    color = db.Column(db.String(50), nullable=False)
+    etp = db.Column(db.Float, default=1.0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def _calculate_grid_position(self):
+        """Calcule la position relative dans la grille."""
+        def get_quarter_position(d: date) -> float:
+            if d.year > 2025:
+                return 80.0
+            
+            quarter = (d.month - 1) // 3
+            base_position = quarter * 20.0
+            
+            month_in_quarter = (d.month - 1) % 3
+            days_in_quarter = 90
+            days_from_quarter_start = (month_in_quarter * 30) + (d.day - 1)
+            relative_position = (days_from_quarter_start / days_in_quarter) * 20.0
+            
+            return base_position + relative_position
+        
+        start_pos = get_quarter_position(self.start_date)
+        end_pos = get_quarter_position(self.end_date)
+        
+        if end_pos < start_pos:
+            end_pos = 100.0
+        
+        width = end_pos - start_pos
+        
+        if width < 15 and (self.end_date.month - self.start_date.month >= 1):
+            width = 15
+        elif width < 8:
+            width = 8
+        
+        return start_pos, width
+    
+    def to_dict(self):
+        start, width = self._calculate_grid_position()
+        return {
+            'id': self.id,
+            'start': start,
+            'width': width,
+            'color': self.color,
+            'text': self.text,
+            'etp': self.etp,
+            'start_date': self.start_date.isoformat(),
+            'end_date': self.end_date.isoformat()
+        }
+
+```
+
+### __init__.py
+```py
+from .project import Project
+from .task import Task
+from .etp_entry import EtpEntry
+
+__all__ = ['Project', 'Task', 'EtpEntry']
+```
+
 ### __init__.py
 ```py
 from .main import bp as main
 from .project import bp as project
 
 __all__ = ['main', 'project']
+```
+
+### timeline.css
+```css
+/* Variables globales */
+:root {
+    --sidebar-width: 200px;
+    --row-height: 3.5rem;
+    --task-height: calc(100% - 1rem);
+    --grid-columns: 5;
+}
+
+/* Reset du conteneur principal */
+.main-content {
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+/* Conteneur de la timeline */
+.timeline-container {
+    background-color: white;
+    padding: 1rem;
+    width: 100%;
+}
+
+/* En-tête de la page */
+.page-title {
+    padding: 0 2rem;
+    margin-bottom: 1rem;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+/* Toggles des streams */
+.stream-toggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    padding: 1rem 2rem;
+    background-color: #f8fafc;
+    border-radius: 0.5rem;
+}
+
+.stream-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+}
+
+/* Style du switch */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 48px;
+    height: 24px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background-color: #e5e7eb;
+    transition: .3s;
+    border-radius: 24px;
+}
+
+.slider:before {
+    content: "";
+    position: absolute;
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .3s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: var(--primary-color);
+}
+
+input:checked + .slider:before {
+    transform: translateX(24px);
+}
+
+/* Structure principale de la timeline */
+.timeline-grid {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.timeline-main {
+    width: 100%;
+    min-width: 100%;
+    padding: 0 1rem;
+}
+
+.period {
+    padding: 0.5rem;
+    text-align: center;
+    border-right: 1px solid rgba(255, 255, 255, 0.2);
+    font-size: 0.875rem;
+}
+
+/* Grille des périodes */
+.periods-grid {
+    display: grid; 
+    grid-template-columns: var(--sidebar-width) repeat(var(--grid-columns), 1fr);
+    background-color: var(--primary-color);
+    gap: 0;
+    color: white;
+    border-radius: 0.25rem;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+
+
+/* Conteneur des lignes */
+.timeline-rows-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+/* Ligne de projet */
+.timeline-row {
+    display: grid;
+    grid-template-columns: var(--sidebar-width) 1fr;
+    min-height: var(--row-height);
+    margin-bottom: 0.5rem;
+}
+
+/* Nom du projet */
+.project-name {
+    font-weight: 600;
+    padding: 0.5rem 1rem;
+    background-color: #f9fafb;
+    border-radius: 0.25rem 0 0 0.25rem;
+    display: flex;
+    align-items: center;
+}
+
+/* Conteneur des tâches */
+.project-tasks {
+    position: relative;
+    background-color: #f9fafb;
+    border-radius: 0 0.25rem 0.25rem 0;
+    padding: 0.5rem;
+    min-height: var(--row-height);
+    width: 100%;
+}
+
+/* Style des lignes de la grille */
+.project-tasks::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(
+        to right,
+        rgba(0, 0, 0, 0.1) 1px,
+        transparent 1px
+    );
+    background-size: calc(100% / var(--grid-columns)) 100%;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Style des tâches */
+.task {
+    position: absolute;
+    max-width: 100%; /* Cela pourrait limiter la largeur */
+    height: var(--task-height);
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    transition: transform 0.2s, box-shadow 0.2s;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    z-index: 1;
+}
+
+.task:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    z-index: 2;
+}
+
+.task:hover::after {
+    content: attr(data-dates);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    z-index: 1000;
+}
+
+/* Styles des jalons */
+.milestones {
+    margin-top: 2rem;
+}
+
+.milestone-container {
+    position: relative;
+    height: 4rem;
+    background-color: #f9fafb;
+    border-radius: 0.25rem;
+    padding: 1rem;
+}
+
+.milestone {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.milestone-dot {
+    width: 1rem;
+    height: 1rem;
+    background-color: var(--secondary-color);
+    border-radius: 50%;
+    margin: 0 auto;
+}
+
+.milestone-text {
+    position: absolute;
+    width: max-content;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+/* Animation pour masquer/afficher les lignes */
+.timeline-row {
+    transition: all 0.3s ease;
+}
+
+.timeline-row.hidden {
+    display: none;
+}
+
+/* Couleurs des tâches */
+.task.bg-blue-600 { background-color: #2563eb; }
+.task.bg-blue-500 { background-color: #3b82f6; }
+.task.bg-blue-400 { background-color: #60a5fa; }
+
+.task.bg-purple-600 { background-color: #9333ea; }
+.task.bg-purple-500 { background-color: #a855f7; }
+.task.bg-purple-400 { background-color: #c084fc; }
+
+.task.bg-green-600 { background-color: #16a34a; }
+.task.bg-green-500 { background-color: #22c55e; }
+.task.bg-green-400 { background-color: #4ade80; }
+
+.task.bg-yellow-600 { background-color: #ca8a04; }
+.task.bg-yellow-500 { background-color: #eab308; }
+.task.bg-yellow-400 { background-color: #facc15; }
+
+.task.bg-red-600 { background-color: #dc2626; }
+.task.bg-red-500 { background-color: #ef4444; }
+.task.bg-red-400 { background-color: #f87171; }
+
+.task.bg-indigo-600 { background-color: #4f46e5; }
+.task.bg-indigo-500 { background-color: #6366f1; }
+.task.bg-indigo-400 { background-color: #818cf8; }
+
+.task.bg-teal-600 { background-color: #0d9488; }
+.task.bg-teal-500 { background-color: #14b8a6; }
+.task.bg-teal-400 { background-color: #2dd4bf; }
+
+.task.bg-gray-600 { background-color: #4b5563; }
+.task.bg-gray-500 { background-color: #6b7280; }
+.task.bg-gray-400 { background-color: #9ca3af; }
+
+/* Responsive */
+@media (max-width: 1024px) {
+    :root {
+        --sidebar-width: 150px;
+    }
+    
+    .project-name {
+        font-size: 0.875rem;
+    }
+    
+    .task {
+        font-size: 0.75rem;
+    }
+}
+
+
+
+
+
+
+
+/* Modal */
+
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    z-index: 1000;
+}
+
+.modal-content {
+    background-color: white;
+    margin: 10% auto;
+    padding: 20px;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+    position: relative;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.modal-header h2 {
+    margin: 0;
+    color: var(--primary-color);
+}
+
+.close {
+    font-size: 24px;
+    cursor: pointer;
+    color: #666;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    color: #333;
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.modal-footer {
+    margin-top: 20px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.btn-primary, 
+.btn-secondary {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.btn-secondary {
+    background-color: #e5e7eb;
+    color: #374151;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding: 0 2rem;
+}
+
+/* Animations */
+.modal.show {
+    display: block;
+    animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Style pour l'aperçu des couleurs */
+.color-preview {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+    vertical-align: middle;
+}
 ```
 
 ### project.py
@@ -1652,6 +1782,7 @@ from flask import Blueprint, render_template, jsonify, request
 from app.services import ProjectService, EtpService
 from app.models import Project
 from app.constants import TimeConstants
+from datetime import datetime, date
 
 bp = Blueprint('project', __name__, url_prefix='/project')
 
@@ -1681,66 +1812,96 @@ def etp_table():
                          period_totals=period_totals,
                          total_max_etp=total_max_etp)
 
-
-
-@bp.route('/api/update_etp', methods=['POST'])
-def update_etp():
+    
+@bp.route('/api/projects', methods=['POST'])
+def create_project():
     try:
-        if not request.is_json:
-            return jsonify({
-                'status': 'error',
-                'message': 'Request must be JSON'
-            }), 400
-
         data = request.json
-        project_name = data.get('project')
-        period = data.get('period')
-        etp_str = data.get('etp')
-
-        # Validate required fields
-        if not all([project_name, period, etp_str]):
-            return jsonify({
-                'status': 'error',
-                'message': 'Missing required fields: project, period, and etp'
-            }), 400
-
-        # Convert and validate ETP value
-        try:
-            new_etp = float(etp_str)
-            if new_etp < 0:
-                raise ValueError("ETP value cannot be negative")
-        except ValueError as e:
-            return jsonify({
-                'status': 'error',
-                'message': f'Invalid ETP value: {str(e)}'
-            }), 400
-        
-        # Get project by name
-        project = Project.query.filter_by(name=project_name).first()
-        if not project:
-            return jsonify({
-                'status': 'error',
-                'message': f'Project not found: {project_name}'
-            }), 404
-        
-        # Update ETP in database
-        EtpService.update_etp(project.id, period, new_etp)
+        name = data.get('name')
+        if not name:
+            return jsonify({'error': 'Le nom du projet est requis'}), 400
+            
+        color_scheme = data.get('colorScheme', 'blue')
+        project = ProjectService.create_project(name)
         
         return jsonify({
             'status': 'success',
-            'message': f'ETP updated for {project_name} in period {period}',
-            'data': {
-                'project': project_name,
-                'period': period,
-                'etp': new_etp
+            'project': {
+                'id': project.id,
+                'name': project.name
             }
-        })
-
+        }), 201
+        
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
     except Exception as e:
+        return jsonify({'error': 'Erreur lors de la création du projet'}), 500
+    
+@bp.route('/api/tasks', methods=['POST'])
+def create_task():
+    try:
+        data = request.json
+        required_fields = ['project_id', 'text', 'start_date', 'end_date']
+        
+        if not all(field in data for field in required_fields):
+            return jsonify({'error': 'Tous les champs requis doivent être renseignés'}), 400
+        
+        project_id = int(data['project_id'])
+            
+        # Conversion des dates
+        start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date()
+        end_date = datetime.strptime(data['end_date'], '%Y-%m-%d').date()
+        
+        # Récupération du projet
+        project = ProjectService.get_project_by_id(project_id)
+        if not project:
+            return jsonify({'error': 'Projet non trouvé'}), 404
+            
+        # Définir les couleurs disponibles pour le projet
+        colors = ['blue', 'purple', 'green', 'yellow', 'red', 'indigo', 'teal', 'gray']
+        default_color = colors[project_id % len(colors)]  # Utilise l'ID du projet pour choisir une couleur
+        
+        # Déterminer l'intensité en fonction du nombre de tâches existantes
+        intensities = ['600', '500', '400']
+        intensity = intensities[len(project.tasks) % len(intensities)]
+        
+        color = f"{default_color}-{intensity}"
+        
+        print(f"Creating task with color: {color}")
+        
+        task = ProjectService.create_task(
+            project_id=project_id,
+            text=data['text'],
+            start_date=start_date,
+            end_date=end_date,
+            color=color,
+            etp=float(data.get('etp', 1.0))
+        )
+        
+        if task:
+            task_dict = task.to_dict()
+            print(f"Task created successfully: {task_dict}")
+            return jsonify({
+                'status': 'success',
+                'task': task_dict
+            }), 201
+        else:
+            raise Exception("La tâche n'a pas été créée correctement")
+        
+    except Exception as e:
+        print(f"Error creating task: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/api/projects')
+def get_projects():
+    try:
+        projects = ProjectService.get_all_projects()
         return jsonify({
-            'status': 'error',
-            'message': f'Failed to update ETP: {str(e)}'
-        }), 500
+            'status': 'success',
+            'projects': [{'id': p.id, 'name': p.name} for p in projects]
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 ```
 
 ### main.py
@@ -1754,120 +1915,469 @@ def index():
     return render_template('base.html')
 ```
 
-### timeline.html
-```html
-{% extends "base.html" %}
+### project.py
+```py
+from app import db
+from datetime import datetime
 
-{% block title %}Timeline - Project Manager{% endblock %}
-
-{% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/timeline.css') }}">
-{% endblock %}
-
-{% block content %}
-    <div class="timeline-container">
-        <h1 class="page-title">Project Timeline</h1>
-        
-        <div class="timeline-grid">
-            <div class="timeline-main">
-                <div class="periods-grid">
-                    <div class="period"></div>
-                    {% for period in periods %}
-                    <div class="period">{{ period }}</div>
-                    {% endfor %}
-                </div>
-
-                <div class="timeline-rows-container">
-                    {% for project in projects %}
-                    <div class="timeline-row" data-project-name="{{ project.name }}">
-                        <div class="project-name">{{ project.name }}</div>
-                        <div class="project-tasks">
-                            {% for task in project.tasks %}
-                            {% set start_percent = task.start %}
-                            {% set width_percent = task.width %}
-                            <div class="task bg-{{ task.color }}"
-                                style="left: {{ start_percent }}%; width: {{ width_percent }}%;"
-                                data-task-info="{{ task.text }}"
-                                data-dates="{{ task.start_date }} - {{ task.end_date }}">
-                                {{ task.text }}
-                            </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-    </div>
-{% endblock %}
-
-{% block extra_js %}
-<script src="{{ url_for('static', filename='js/project/timeline.js') }}"></script>
-{% endblock %}
+class Project(db.Model):
+    __tablename__ = 'projects'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    color_scheme = db.Column(db.String(50), nullable=False, default='blue')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relations
+    tasks = db.relationship('Task', backref='project', lazy=True, cascade='all, delete-orphan')
+    etp_entries = db.relationship('EtpEntry', backref='project', lazy=True, cascade='all, delete-orphan')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'color_scheme': self.color_scheme,
+            'tasks': [task.to_dict() for task in self.tasks]
+        }
 ```
 
-### etp_table.html
-```html
-{% extends "base.html" %}
+### normalize.css
+```css
+/* Modern CSS Reset */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
 
-{% block title %}ETP Table - Project Manager{% endblock %}
+/* Basic resets and defaults */
+body {
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+}
 
-{% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/project/etp_table.css') }}">
-{% endblock %}
+img,
+picture,
+video,
+canvas,
+svg {
+    display: block;
+    max-width: 100%;
+}
 
-{% block content %}
-<div class="etp-container">
-    <h1 class="page-title">Resource Allocation (ETP)</h1>
+input,
+button,
+textarea,
+select {
+    font: inherit;
+}
+
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    overflow-wrap: break-word;
+}
+```
+
+### etp_table.js
+```js
+// static/js/project/etp_table.js
+
+document.addEventListener('DOMContentLoaded', function() {
+    const table = document.querySelector('.etp-table');
+    let activeInput = null;
+
+    // Gérer le clic sur une cellule éditable
+    document.addEventListener('click', function(e) {
+        const cell = e.target.closest('.editable-cell');
+        if (!cell) return;
+        if (cell.querySelector('input')) return;
+
+        const valueSpan = cell.querySelector('.etp-value');
+        const currentValue = valueSpan.textContent.trim();
+
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.step = '0.1';
+        input.min = '0';
+        input.value = currentValue;
+        input.className = 'etp-input';
+
+        valueSpan.style.display = 'none';
+        cell.appendChild(input);
+        input.focus();
+        activeInput = input;
+
+        input.select();
+    });
+
+    // Gérer la validation des modifications
+    async function saveChange(cell, newValue) {
+        const project = cell.closest('tr').dataset.project;
+        const period = cell.dataset.period;
+
+        try {
+            const response = await fetch('/project/api/update_etp', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    project,
+                    period,
+                    etp: newValue
+                })
+            });
+
+            if (!response.ok) throw new Error('Failed to update ETP');
+
+            const valueSpan = cell.querySelector('.etp-value');
+            valueSpan.textContent = parseFloat(newValue).toFixed(2);
+            valueSpan.style.display = '';
+            valueSpan.classList.add('updated');
+            
+            if (cell.querySelector('input')) {
+                cell.querySelector('input').remove();
+            }
+
+            updateTotals();
+            
+        } catch (error) {
+            console.error('Error updating ETP:', error);
+            alert('Failed to update ETP');
+        }
+    }
+
+    // Gérer les touches clavier pendant l'édition
+    document.addEventListener('keydown', function(e) {
+        if (!activeInput) return;
+        
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const newValue = activeInput.value;
+            if (newValue && !isNaN(newValue)) {
+                const cell = activeInput.closest('.editable-cell');
+                saveChange(cell, newValue);
+            }
+            activeInput = null;
+        } else if (e.key === 'Escape') {
+            const cell = activeInput.closest('.editable-cell');
+            cell.querySelector('.etp-value').style.display = '';
+            activeInput.remove();
+            activeInput = null;
+        }
+    });
+
+    // Gérer la perte de focus
+    document.addEventListener('click', function(e) {
+        if (activeInput && !activeInput.contains(e.target) && !e.target.closest('.editable-cell')) {
+            const newValue = activeInput.value;
+            if (newValue && !isNaN(newValue)) {
+                const cell = activeInput.closest('.editable-cell');
+                saveChange(cell, newValue);
+            }
+            activeInput = null;
+        }
+    });
+
+    // Fonction pour mettre à jour tous les totaux
+    function updateTotals() {
+        // Totaux par période
+        const periods = ['2025 Q1-Q2', '2025 Q3-Q4', '2026-2027'];
+        
+        periods.forEach(period => {
+            const cells = table.querySelectorAll(`td[data-period="${period}"] .etp-value`);
+            const total = Array.from(cells)
+                .reduce((sum, cell) => sum + parseFloat(cell.textContent || 0), 0);
+            const totalCell = table.querySelector(`.period-total[data-period="${period}"]`);
+            if (totalCell) {
+                totalCell.textContent = total.toFixed(2);
+                totalCell.classList.add('updated');
+            }
+        });
+
+        // Totaux par ligne (max ETP)
+        const projectRows = table.querySelectorAll('tr[data-project]');
+        projectRows.forEach(row => {
+            const etpCells = row.querySelectorAll('.etp-value');
+            const maxEtp = Array.from(etpCells)
+                .reduce((max, cell) => Math.max(max, parseFloat(cell.textContent || 0)), 0);
+            const totalCell = row.querySelector('.row-total');
+            if (totalCell) {
+                totalCell.textContent = maxEtp.toFixed(2);
+                totalCell.classList.add('updated');
+            }
+        });
+
+        // Total général (somme des max ETP)
+        const rowTotals = Array.from(table.querySelectorAll('.row-total'))
+            .map(cell => parseFloat(cell.textContent || 0));
+        const grandTotal = rowTotals.reduce((sum, val) => sum + val, 0);
+        const grandTotalCell = table.querySelector('.grand-total');
+        if (grandTotalCell) {
+            grandTotalCell.textContent = grandTotal.toFixed(2);
+            grandTotalCell.classList.add('updated');
+        }
+
+        // Retirer les classes 'updated' après l'animation
+        setTimeout(() => {
+            table.querySelectorAll('.updated').forEach(el => {
+                el.classList.remove('updated');
+            });
+        }, 1000);
+    }
+});
+```
+
+### etp_entry.py
+```py
+from app import db
+from datetime import datetime
+
+class EtpEntry(db.Model):
+    __tablename__ = 'etp_entries'
     
-    <div class="etp-table-container">
-        <table class="etp-table">
-            <thead>
-                <tr>
-                    <th>Stream</th>
-                    <th>2025 Q1-Q2</th>
-                    <th>2025 Q3-Q4</th>
-                    <th>2026-2027</th>
-                    <th>ETP Total</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for row in etp_data %}
-                <tr data-project="{{ row.name }}">
-                    <td>{{ row.name }}</td>
-                    <td class="text-center editable-cell" data-period="2025 Q1-Q2">
-                        <span class="etp-value">{{ "%.2f"|format(row["2025 Q1-Q2"]) }}</span>
-                    </td>
-                    <td class="text-center editable-cell" data-period="2025 Q3-Q4">
-                        <span class="etp-value">{{ "%.2f"|format(row["2025 Q3-Q4"]) }}</span>
-                    </td>
-                    <td class="text-center editable-cell" data-period="2026-2027">
-                        <span class="etp-value">{{ "%.2f"|format(row["2026-2027"]) }}</span>
-                    </td>
-                    <td class="text-center row-total">{{ "%.2f"|format(row.total) }}</td>
-                </tr>
-                {% endfor %}
-                <tr class="total-row">
-                    <td class="bold">Total ETP by period</td>
-                    <td class="text-center period-total" data-period="2025 Q1-Q2">
-                        {{ "%.2f"|format(period_totals["2025 Q1-Q2"]) }}
-                    </td>
-                    <td class="text-center period-total" data-period="2025 Q3-Q4">
-                        {{ "%.2f"|format(period_totals["2025 Q3-Q4"]) }}
-                    </td>
-                    <td class="text-center period-total" data-period="2026-2027">
-                        {{ "%.2f"|format(period_totals["2026-2027"]) }}
-                    </td>
-                    <td class="text-center grand-total">{{ "%.2f"|format(total_max_etp) }}</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-</div>
-{% endblock %}
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
+    period = db.Column(db.String(20), nullable=False)
+    etp_value = db.Column(db.Float, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('project_id', 'period', name='uix_project_period'),
+    )
 
-{% block extra_js %}
-<script src="{{ url_for('static', filename='js/project/etp_table.js') }}"></script>
-{% endblock %}
+```
+
+### base.js
+```js
+// base.js - Fonctionnalités communes à toute l'application
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Configuration des variables globales
+    window.APP = {
+        config: {
+            animationDuration: 300,
+            dateFormat: 'DD/MM/YYYY',
+            apiEndpoint: '/api'
+        }
+    };
+
+    // Gestion de la navigation active
+    const handleActiveNavigation = () => {
+        const currentPath = window.location.pathname;
+        document.querySelectorAll('.nav-links a').forEach(link => {
+            if (link.getAttribute('href') === currentPath) {
+                link.classList.add('active');
+            }
+        });
+    };
+
+    // Gestion des notifications
+    const notifications = {
+        container: null,
+        
+        init() {
+            this.container = document.createElement('div');
+            this.container.className = 'notifications-container';
+            document.body.appendChild(this.container);
+        },
+
+        show(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification notification-${type}`;
+            notification.textContent = message;
+            
+            this.container.appendChild(notification);
+            
+            // Animation d'entrée
+            setTimeout(() => {
+                notification.classList.add('show');
+            }, 10);
+
+            // Auto-suppression après 5 secondes
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => {
+                    notification.remove();
+                }, 300);
+            }, 5000);
+        }
+    };
+
+    // Gestion du thème
+    const themeManager = {
+        init() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            this.setTheme(savedTheme);
+            
+            // Écouteur pour le bouton de changement de thème (si présent)
+            const themeToggle = document.querySelector('.theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', () => {
+                    const newTheme = document.body.classList.contains('dark-theme') ? 'light' : 'dark';
+                    this.setTheme(newTheme);
+                });
+            }
+        },
+
+        setTheme(theme) {
+            document.body.classList.remove('light-theme', 'dark-theme');
+            document.body.classList.add(`${theme}-theme`);
+            localStorage.setItem('theme', theme);
+        }
+    };
+
+    // Utilitaires pour les dates
+    const dateUtils = {
+        formatDate(date) {
+            return new Intl.DateTimeFormat('fr-FR').format(date);
+        },
+
+        formatDateTime(date) {
+            return new Intl.DateTimeFormat('fr-FR', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            }).format(date);
+        }
+    };
+
+    // Gestion des formulaires
+    const formManager = {
+        init() {
+            document.querySelectorAll('form').forEach(form => {
+                form.addEventListener('submit', this.handleSubmit.bind(this));
+            });
+        },
+
+        handleSubmit(event) {
+            const form = event.target;
+            
+            // Désactiver le bouton submit pendant le traitement
+            const submitButton = form.querySelector('[type="submit"]');
+            if (submitButton) {
+                submitButton.disabled = true;
+            }
+
+            // Réactiver le bouton après le traitement
+            setTimeout(() => {
+                if (submitButton) {
+                    submitButton.disabled = false;
+                }
+            }, 1000);
+        },
+
+        validateForm(form) {
+            let isValid = true;
+            const inputs = form.querySelectorAll('input[required], select[required], textarea[required]');
+            
+            inputs.forEach(input => {
+                if (!input.value.trim()) {
+                    isValid = false;
+                    this.showError(input, 'Ce champ est requis');
+                } else {
+                    this.clearError(input);
+                }
+            });
+
+            return isValid;
+        },
+
+        showError(input, message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'form-error';
+            errorDiv.textContent = message;
+            input.classList.add('error');
+            input.parentNode.appendChild(errorDiv);
+        },
+
+        clearError(input) {
+            input.classList.remove('error');
+            const errorDiv = input.parentNode.querySelector('.form-error');
+            if (errorDiv) {
+                errorDiv.remove();
+            }
+        }
+    };
+
+    // Gestion des erreurs globales
+    //window.onerror = function(msg, url, lineNo, columnNo, error) {
+        //console.error('Error: ', msg, url, lineNo, columnNo, error);
+        //notifications.show('Une erreur est survenue', 'error');
+        //return false;
+    //};
+
+    // Initialisation des composants
+    const init = () => {
+        handleActiveNavigation();
+        notifications.init();
+        themeManager.init();
+        formManager.init();
+        
+        // Exposer les utilitaires globalement
+        window.APP = {
+            ...window.APP,
+            notifications,
+            dateUtils,
+            formManager
+        };
+    };
+
+    // Lancer l'initialisation
+    init();
+});
+```
+
+### constants.py
+```py
+class TimeConstants:
+    PERIODS_MAPPING = {
+        1: "2025 Q1-Q2",
+        2: "2025 Q3-Q4",
+        3: "2026-2027"
+    }
+    
+    PERIODS_DISPLAY = [
+        "2025 Q1",
+        "2025 Q2",
+        "2025 Q3",
+        "2025 Q4",
+        "2026-2027"
+    ]
+    
+    MILESTONES = [
+        {"position": "left-1/3", "text": "RFI"},
+        {"position": "left-1/2", "text": "RFP"},
+        {"position": "left-2/3", "text": "Pilot"},
+        {"position": "right-1/6", "text": "Déploiement"}
+    ]
+```
+
+### config.py
+```py
+from datetime import timedelta
+
+class Config:
+    SECRET_KEY = 'your-secret-key-here'
+    DEBUG = False
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///project_manager.db'
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+class DevelopmentConfig(Config):
+    DEBUG = True
+
+class ProductionConfig(Config):
+    DEBUG = False
 ```
 
