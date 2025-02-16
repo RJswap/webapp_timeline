@@ -49,9 +49,9 @@
                                 data-etp="{{ task.etp }}">
                                 {{ task.text }}
                                 <div class="task-tooltip">
-                                    <div class="dates">{{ task.dates }}</div>
+                                    <span class="dates">{{ task.dates }}</span>
                                     {% if task.comment %}
-                                    <div class="comment">{{ task.comment }}</div>
+                                    <span class="comment">{{ task.comment }}</span>
                                     {% endif %}
                                 </div>
                             
@@ -158,7 +158,7 @@
                 <input type="hidden" id="editTaskId" name="task_id">
                 <div class="form-group">
                     <label for="editTaskProject">Projet</label>
-                    <select id="editTaskProject" name="project_id" required disabled>
+                    <select id="editTaskProject" name="project_id" required>
                         <!-- Rempli dynamiquement -->
                     </select>
                 </div>

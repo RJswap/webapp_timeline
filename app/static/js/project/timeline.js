@@ -6,6 +6,7 @@ const TimelineManager = {
         this.validateTaskPositions();
         this.setupProjectButtons();
         this.setupTaskButtons();
+        this.calculateTaskPositions();
     },
 
     setupStreamToggles() {
@@ -86,6 +87,66 @@ const TimelineManager = {
         }
     },
 
+    calculateTaskPositions() {
+        document.querySelectorAll('.timeline-row').forEach(row => {
+            const tasks = Array.from(row.querySelectorAll('.task'));
+            
+            // Tri des tâches par date de début
+            tasks.sort((a, b) => {
+                const aStart = this.getTaskPosition(a).start;
+                const bStart = this.getTaskPosition(b).start;
+                return aStart - bStart;
+            });
+
+            // Initialisation des niveaux
+            const levels = [];
+            
+            tasks.forEach(task => {
+                const taskPos = this.getTaskPosition(task);
+                let level = 0;
+
+                // Trouver le premier niveau disponible pour la tâche
+                while (this.isLevelOccupied(levels, level, taskPos)) {
+                    level++;
+                }
+
+                // Ajouter la tâche au niveau trouvé
+                if (!levels[level]) {
+                    levels[level] = [];
+                }
+                levels[level].push(taskPos);
+
+                // Appliquer la position verticale à la tâche
+                task.style.top = `calc(${level} * (var(--task-base-height) + var(--task-margin)))`;
+            });
+
+            // Ajuster la hauteur du conteneur de projet
+            const projectTasks = row.querySelector('.project-tasks');
+            const totalLevels = levels.length;
+            projectTasks.style.height = `calc(${totalLevels} * (var(--task-base-height) + var(--task-margin)) + 1rem)`;
+        });
+    },
+
+    getTaskPosition(taskElement) {
+        return {
+            start: parseFloat(taskElement.style.left),
+            end: parseFloat(taskElement.style.left) + parseFloat(taskElement.style.width),
+            element: taskElement
+        };
+    },
+
+    isLevelOccupied(levels, level, newTask) {
+        if (!levels[level]) return false;
+        
+        return levels[level].some(existingTask => {
+            // Vérifier si les tâches se chevauchent
+            return !(
+                newTask.start >= existingTask.end ||
+                newTask.end <= existingTask.start
+            );
+        });
+    },
+    
     updatePositions() {
         let currentOffset = 0;
         this.timelineRows.forEach(row => {
@@ -110,7 +171,7 @@ const TimelineManager = {
             addTaskBtn.addEventListener('click', () => {
                 ModalManager.openNewTaskModal();
             });
-        }
+        }     
 
         // Gestionnaire pour les tâches existantes
         document.querySelectorAll('.task').forEach(task => {
@@ -137,8 +198,7 @@ const ModalManager = {
     init() {
         this.initElements();
         this.setupEventListeners();
-        this.setupProjectHandlers();
-        this.setupTaskHandlers();
+        this.setupTaskHandlers(); 
         this.initializeDateInputs();
     },
 
@@ -193,7 +253,36 @@ const ModalManager = {
         }
     },
 
-    
+    setupTaskHandlers() {
+        // Assurer que les sélecteurs de projet sont initialisés au démarrage
+        this.updateProjectSelect();
+
+        // Gestionnaire pour le bouton "Nouvelle Tâche"
+        const addTaskBtn = document.getElementById('addTaskBtn');
+        if (addTaskBtn) {
+            addTaskBtn.addEventListener('click', () => {
+                this.openNewTaskModal();
+            });
+        }
+
+        // Gestionnaire pour les tâches existantes
+        document.querySelectorAll('.task').forEach(task => {
+            task.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const taskData = {
+                    id: task.dataset.taskId,
+                    projectId: task.closest('.timeline-row').dataset.projectId,
+                    text: task.dataset.taskInfo,
+                    comment: task.dataset.comment,
+                    startDate: task.dataset.startDate,
+                    endDate: task.dataset.endDate,
+                    etp: task.dataset.etp
+                };
+                this.openEditTaskModal(taskData);
+            });
+        });
+    },
+
     openNewProjectModal() {
         const modal = this.elements.newProjectModal;
         if (!modal) return;
@@ -352,12 +441,20 @@ const ModalManager = {
         e.preventDefault();
         const formData = new FormData(this.elements.editTaskForm);
         const taskId = formData.get('task_id');
+        const newProjectId = formData.get('project_id');
         
         try {
             const response = await fetch(`/project/api/tasks/${taskId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(Object.fromEntries(formData))
+                body: JSON.stringify({
+                    project_id: newProjectId,  // Ajout du project_id dans les données envoyées
+                    text: formData.get('text'),
+                    comment: formData.get('comment'),
+                    start_date: formData.get('start_date'),
+                    end_date: formData.get('end_date'),
+                    etp: formData.get('etp')
+                })
             });
 
             if (!response.ok) {

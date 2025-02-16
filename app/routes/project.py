@@ -154,10 +154,23 @@ def update_task(task_id):
         
         if not task:
             return make_response(error='Tâche non trouvée', status=404)
+        
+        # Mise à jour du projet si nécessaire
+        if 'project_id' in data:
+            new_project = Project.query.get(int(data['project_id']))
+            if not new_project:
+                return make_response(error='Nouveau projet non trouvé', status=404)
             
-        # Mise à jour des champs
+            # Si le projet a changé, mettre à jour la couleur de la tâche
+            if task.project_id != new_project.id:
+                # Conserver l'intensité de la couleur actuelle
+                intensity = task.color.split('-')[1]
+                task.color = f"{new_project.color_scheme}-{intensity}"
+                task.project_id = new_project.id
+            
+        # Mise à jour des autres champs
         task.text = data.get('text', task.text)
-        task.comment = data.get('comment', task.comment) 
+        task.comment = data.get('comment', task.comment)
         task.start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date()
         task.end_date = datetime.strptime(data['end_date'], '%Y-%m-%d').date()
         task.etp = float(data.get('etp', task.etp))
@@ -168,7 +181,7 @@ def update_task(task_id):
         
     except Exception as e:
         db.session.rollback()
-        return make_response(error=e, status=500)
+        return make_response(error=str(e), status=500)
 
 @bp.route('/api/tasks/<int:task_id>', methods=['DELETE'])
 def delete_task(task_id):

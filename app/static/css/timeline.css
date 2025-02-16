@@ -4,6 +4,8 @@
     --row-height: 3.5rem;
     --task-height: calc(100% - 1rem);
     --grid-columns: 5;
+    --task-base-height: 2rem;
+    --task-margin: 0.5rem;
 }
 
 /* Reset du conteneur principal */
@@ -136,8 +138,9 @@ input:checked + .slider:before {
 .timeline-row {
     display: grid;
     grid-template-columns: var(--sidebar-width) 1fr;
-    min-height: var(--row-height);
-    margin-bottom: 0.5rem;
+    min-height: calc(var(--task-base-height) + 1rem);
+    margin-bottom: 1rem;
+    transition: height 0.3s ease;
 }
 
 /* Nom du projet */
@@ -156,8 +159,10 @@ input:checked + .slider:before {
     background-color: #f9fafb;
     border-radius: 0 0.25rem 0.25rem 0;
     padding: 0.5rem;
-    min-height: var(--row-height);
+    min-height: calc(var(--task-base-height) + 1rem);
     width: 100%;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Style des lignes de la grille */
@@ -178,9 +183,8 @@ input:checked + .slider:before {
 /* Style des tâches */
 .task {
     position: absolute;
-    max-width: 100%; /* Cela pourrait limiter la largeur */
-    height: var(--task-height);
-    padding: 0.5rem;
+    height: var(--task-base-height);
+    padding: 0.25rem 0.5rem;
     border-radius: 0.25rem;
     font-size: 0.75rem;
     color: white;
@@ -191,6 +195,7 @@ input:checked + .slider:before {
     white-space: nowrap;
     text-overflow: ellipsis;
     z-index: 1;
+    margin-bottom: var(--task-margin);
 }
 
 .task:hover {
@@ -325,6 +330,7 @@ input:checked + .slider:before {
     height: 100%;
     background-color: rgba(0,0,0,0.5);
     z-index: 1000;
+    overflow-y: auto;
 }
 
 .modal-content {
@@ -403,6 +409,7 @@ input:checked + .slider:before {
 .action-buttons {
     display: flex;
     gap: 0.5rem;
+    margin-bottom: 1rem;
 }
 
 /* Animations */
@@ -457,10 +464,55 @@ input:checked + .slider:before {
     margin-right: auto;
 }
 
+/* Responsive pour petits écrans */
+@media (max-width: 640px) {
+    .modal-content {
+        margin: 0;
+        height: 100vh;
+        max-height: 100vh;
+        width: 100%;
+        border-radius: 0;
+    }
+
+    .modal-header {
+        position: sticky;
+        top: 0;
+        background-color: white;
+        z-index: 1;
+        padding: 1rem 0;
+    }
+
+    .modal-footer {
+        position: sticky;
+        bottom: 0;
+        background-color: white;
+        padding: 1rem 0;
+        border-top: 1px solid #e5e7eb;
+    }
+}
+
 /* Style pour le projet désactivé */
 #editTaskProject:disabled {
     background-color: #f3f4f6;
     cursor: not-allowed;
+}
+
+/* Style spécifique pour le textarea des commentaires */
+#editTaskComment,
+#taskComment {
+    resize: vertical;
+    min-height: 100px;
+    max-height: 200px;
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    font-family: inherit;
+    overflow: auto;
+    background-color: white;
+    color: #1f2937;
 }
 
 .project-name {
@@ -490,42 +542,34 @@ input:checked + .slider:before {
 
 .task-tooltip {
     display: none;
-    position: absolute; /* Revenir à absolute pour le positionnement relatif à la tâche */
-    bottom: 100%; /* Positionner le bas du tooltip au niveau du haut de la tâche */
-    left: 50%;
-    transform: translateX(-50%);
+    position: fixed;
+    transform: translate(-50%, -100%);
     background-color: rgba(0, 0, 0, 0.9);
     color: white;
-    padding: 8px; /* Réduire le padding global */
+    padding: 1px 6px;
     border-radius: 0.25rem;
     font-size: 0.75rem;
-    white-space: pre-wrap;
-    min-width: 200px;
-    max-width: 400px;
-    z-index: 1000;
+    white-space: nowrap;
+    z-index: 9999;
     pointer-events: none;
-    margin-bottom: 4px; /* Petit espace entre le tooltip et la tâche */
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    margin-top: -2px;
 }
 
 .task-tooltip .dates {
+    display: inline-block;
     color: #93c5fd;
-    padding: 0; /* Supprimer tout padding */
-    margin: 0; /* Supprimer toute marge */
-    line-height: 1.2; /* Réduire la hauteur de ligne */
-}
-
-.task-tooltip .task-text {
-    padding: 4px 0; /* Ajouter un peu d'espace vertical autour du texte */
-    margin: 0;
-    line-height: 1.2;
+    line-height: 1;
+    text-align: center;
 }
 
 .task-tooltip .comment {
-    border-top: 1px solid rgba(255, 255, 255, 0.2);
-    padding-top: 4px;
-    margin-top: 4px;
+    display: block;
+    padding-top: 1px;
+    margin-top: 1px;
     font-style: italic;
     color: #cbd5e1;
-    line-height: 1.2;
+    line-height: 1;
+    font-size: 0.7rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
