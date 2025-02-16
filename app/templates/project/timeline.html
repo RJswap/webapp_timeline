@@ -4,6 +4,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/timeline.css') }}">
+<script src="https://cdn.tailwindcss.com"></script>
 {% endblock %}
 
 {% block content %}
@@ -20,49 +21,8 @@
             </button>
         </div>
         
-        <div class="timeline-grid">
-            <div class="timeline-main">
-                <div class="periods-grid">
-                    <div class="period"></div>
-                    {% for period in periods %}
-                    <div class="period">{{ period }}</div>
-                    {% endfor %}
-                </div>
-
-                <div class="timeline-rows-container">
-                    {% for project in projects %}
-                    <div class="timeline-row" 
-                         data-project-name="{{ project.name }}" 
-                         data-project-id="{{ project.id }}"
-                         data-color-scheme="{{ project.color_scheme }}">
-                        <div class="project-name">{{ project.name }}</div>
-                        <div class="project-tasks">
-                            {% for task in project.tasks %}
-                            <div class="task bg-{{ task.color }}"
-                                style="left: {{ task.start }}%; width: {{ task.width }}%;"
-                                data-task-id="{{ task.id }}"
-                                data-task-info="{{ task.text }}"
-                                data-comment="{{ task.comment }}"
-                                data-dates="{{ task.dates }}"
-                                data-start-date="{{ task.raw_start_date }}"
-                                data-end-date="{{ task.raw_end_date }}"
-                                data-etp="{{ task.etp }}">
-                                {{ task.text }}
-                                <div class="task-tooltip">
-                                    <span class="dates">{{ task.dates }}</span>
-                                    {% if task.comment %}
-                                    <span class="comment">{{ task.comment }}</span>
-                                    {% endif %}
-                                </div>
-                            
-                            </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
+        <!-- C'est ce bloc qui a été modifié-->
+        <div id="timeline-root" class="timeline-content h-screen"></div>
     </div>
 
     <div id="newProjectModal" class="modal">
@@ -193,5 +153,15 @@
 {% endblock %}
 
 {% block extra_js %}
+<!-- Dépendances -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/umd/lucide-react.js"></script>
+
+<!-- Gestionnaire de modales -->
 <script src="{{ url_for('static', filename='js/project/timeline.js') }}"></script>
+
+<!-- Composant Timeline -->
+{% include 'project/timeline-component.html' %}
 {% endblock %}

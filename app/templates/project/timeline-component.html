@@ -1,0 +1,235 @@
+{% raw %}
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+const TimelineProject = ({ project, visibleRange, scale, onTaskClick }) => {
+  const calculateTaskPosition = (task) => {
+    const timelineStart = visibleRange.start.getTime();
+    const timelineEnd = visibleRange.end.getTime();
+    const duration = timelineEnd - timelineStart;
+    
+    const taskStart = new Date(task.start_date).getTime();
+    const taskEnd = new Date(task.end_date).getTime();
+    
+    const left = ((taskStart - timelineStart) / duration) * 100;
+    const width = ((taskEnd - taskStart) / duration) * 100;
+    
+    const style = {
+      left: left + '%',
+      width: width + '%'
+    };
+    return style;
+  };
+
+  return (
+    <div className="relative h-20 border-b bg-gray-50">
+      {project.tasks.map((task, taskIndex) => {
+        const position = calculateTaskPosition(task);
+        const style = {
+          ...position,
+          top: (taskIndex * 16) + 'px'
+        };
+        
+        return (
+          <div
+            key={task.id}
+            className="absolute h-12 rounded-lg p-2 text-white text-sm cursor-pointer transition-all hover:-translate-y-0.5"
+            style={style}
+          >
+            <span className="truncate block">{task.text}</span>
+            <div className="task-tooltip hidden group-hover:block">
+              <span className="dates">{task.dates}</span>
+              {task.comment && <span className="comment">{task.comment}</span>}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const TimelineView = () => {
+  const [scale, setScale] = useState('month');
+  const [visibleRange, setVisibleRange] = useState({
+    start: new Date(2025, 0, 1),
+    end: new Date(2026, 0, 1)
+  });
+  const [projects, setProjects] = useState([]);
+  const [visibleProjects, setVisibleProjects] = useState(new Set());
+  const timelineRef = useRef(null);
+
+  useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        const response = await fetch('/project/api/timeline-data');
+        const data = await response.json();
+        console.log('Fetched projects:', data);
+        if (data.projects) {
+          setProjects(data.projects);
+          setVisibleProjects(new Set(data.projects.map(p => p.id)));
+        }
+      } catch (error) {
+        console.error('Error fetching projects:', error);
+      }
+    };
+    fetchProjects();
+  }, []);
+
+  const generateTimeColumns = () => {
+    const columns = [];
+    let current = new Date(visibleRange.start);
+    
+    while (current < visibleRange.end) {
+      if (scale === 'month') {
+        columns.push({
+          date: new Date(current),
+          label: current.toLocaleString('default', { month: 'short', year: '2-digit' })
+        });
+        current = new Date(current.setMonth(current.getMonth() + 1));
+      } else {
+        const quarter = Math.floor(current.getMonth() / 3) + 1;
+        columns.push({
+          date: new Date(current),
+          label: 'Q' + quarter + ' ' + current.getFullYear()
+        });
+        current = new Date(current.setMonth(current.getMonth() + 3));
+      }
+    }
+    return columns;
+  };
+
+  const moveTimeline = (direction) => {
+    const monthsToMove = scale === 'month' ? 1 : 3;
+    setVisibleRange(prev => {
+      const start = new Date(prev.start);
+      const end = new Date(prev.end);
+      start.setMonth(start.getMonth() + (direction * monthsToMove));
+      end.setMonth(end.getMonth() + (direction * monthsToMove));
+      return { start, end };
+    });
+  };
+
+  return (
+    <div className="w-full h-full flex flex-col">
+      <div className="flex items-center justify-between p-4 bg-white border-b">
+        <div className="flex items-center gap-2">
+          <button 
+            className="p-2 rounded hover:bg-gray-100"
+            onClick={() => moveTimeline(-1)}
+          >
+            ←
+          </button>
+          <button 
+            className="p-2 rounded hover:bg-gray-100"
+            onClick={() => moveTimeline(1)}
+          >
+            →
+          </button>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            className="p-2 rounded hover:bg-gray-100"
+            onClick={() => setScale(scale === 'month' ? 'quarter' : 'month')}
+          >
+            {scale === 'month' ? '−' : '+'}
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-grow overflow-hidden">
+        <div className="w-48 flex-shrink-0 bg-gray-50 border-r">
+          {projects.map(project => (
+            <div key={project.id} className="p-4 border-b">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={visibleProjects.has(project.id)}
+                  onChange={(e) => {
+                    const newVisible = new Set(visibleProjects);
+                    if (e.target.checked) {
+                      newVisible.add(project.id);
+                    } else {
+                      newVisible.delete(project.id);
+                    }
+                    setVisibleProjects(newVisible);
+                  }}
+                />
+                {project.name}
+              </label>
+            </div>
+          ))}
+        </div>
+
+        <div 
+          className="flex-grow relative overflow-x-auto"
+          ref={timelineRef}
+        >
+          <div className="sticky top-0 z-10 bg-white">
+            <div className="flex">
+              {generateTimeColumns().map((column, index) => (
+                <div
+                  key={index}
+                  className="flex-shrink-0 p-4 border-r text-center font-medium"
+                  style={{ width: scale === 'month' ? '200px' : '300px' }}
+                >
+                  {column.label}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="relative">
+            <div 
+              className="absolute inset-0 grid"
+              style={{
+                gridTemplateColumns: `repeat(${generateTimeColumns().length}, ${scale === 'month' ? '200px' : '300px'})`
+              }}
+            >
+              {generateTimeColumns().map((_, index) => (
+                <div key={index} className="border-r h-full" />
+              ))}
+            </div>
+
+            {projects
+              .filter(p => visibleProjects.has(p.id))
+              .map(project => (
+                <TimelineProject
+                  key={project.id}
+                  project={project}
+                  visibleRange={visibleRange}
+                  scale={scale}
+                  onTaskClick={(task) => {
+                    if (window.ModalManager) {
+                      window.ModalManager.openEditTaskModal({
+                        id: task.id,
+                        projectId: project.id,
+                        text: task.text,
+                        comment: task.comment,
+                        startDate: task.raw_start_date,
+                        endDate: task.raw_end_date,
+                        etp: task.etp
+                      });
+                    }
+                  }}
+                />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Montage du composant React
+document.addEventListener('DOMContentLoaded', function() {
+  const timelineRoot = document.getElementById('timeline-root');
+  const root = ReactDOM.createRoot(timelineRoot);
+  root.render(React.createElement(TimelineView));
+  
+  // Initialiser le gestionnaire de modales
+  if (window.ModalManager) {
+    window.ModalManager.init();
+  }
+});
+</script>
+{% endraw %}

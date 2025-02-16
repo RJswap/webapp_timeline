@@ -193,3 +193,15 @@ def delete_task(task_id):
         return make_response()
     except Exception as e:
         return make_response(error=e, status=500)
+    
+
+@bp.route('/api/timeline-data', methods=['GET'])
+def get_timeline_data():
+    """Récupère les données pour la timeline"""
+    try:
+        projects = ProjectService.get_all_projects()
+        return jsonify({
+            'projects': [project.to_dict() for project in projects]
+        })
+    except Exception as e:
+        return make_response(error=str(e), status=500)
